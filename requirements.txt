@@ -1,0 +1,11 @@
+wheel
+numpy
+scipy
+kaggle
+gdown
+wandb
+torchtext
+torchgeometry
+torchmetrics
+configparser
+flake8
