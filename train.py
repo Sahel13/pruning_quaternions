@@ -1,13 +1,24 @@
 import os
 import torch
 import helper_methods as H
-import models as M
+# import models.lenet_300_100 as M
+import models.experimentation as M
+# import models.lenet as M
+
+torch.manual_seed(0)
 
 
 """
 Parameters.
 """
-dataset = 'mnist'
+dataset = 'cifar10'
+model_to_run = 'real'
+model = M.Exp2()
+use_gpu = True
+mini_batch = 1000000
+
+# model = (M.QLeNet_300_100() if model_to_run == 'quaternion'
+#          else M.LeNet_300_100())
 
 # For MNIST
 if dataset == 'mnist':
@@ -17,30 +28,24 @@ if dataset == 'mnist':
 
 # For CIFAR10
 elif dataset == 'cifar10':
-    batch_size = 128
-    num_epochs = 40
-    learning_rate = 0.1
+    batch_size = 8
+    num_epochs = 5
+    learning_rate = 0.001
 
 else:
     raise ValueError("Dataset not known.")
 
-# General
-model_to_run = 'real'
-use_gpu = True
-mini_batch = 1000000
 
+# ############ No need to change anything below this ############### #
+
+"""
+Train the model.
+"""
 device = torch.device("cuda:0" if use_gpu else "cpu")
+model.to(device)
 
-
-"""
-Run both models.
-"""
 # Get the data
 trainloader, testloader = H.data_loader(model_to_run, dataset, batch_size)
-
-# Get the model
-model = M.QLeNet_300_100() if model_to_run == 'quaternion' else M.LeNet_300_100()
-model.to(device)
 
 # Display model statistics
 H.display_model(model)
@@ -60,7 +65,9 @@ H.train_model(
     mini_batch
 )
 
-weight_path = os.path.join('open_lth_data',
-    f"{dataset}_weights_{'qcnn' if model_to_run == 'quaternion' else 'cnn'}.pth")
+weight_path = os.path.join(
+    H.results_dir(),
+    "{}_weights_{}.pth".format(dataset, model.name())
+)
 
 torch.save(model.state_dict(), weight_path)

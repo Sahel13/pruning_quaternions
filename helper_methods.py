@@ -1,11 +1,10 @@
 import csv
-import pickle
 import os
 from prettytable import PrettyTable
+import pathlib
 
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset
 import torchvision
 import torchvision.transforms as transforms
 
@@ -13,29 +12,29 @@ import torch.nn.utils.prune as prune
 
 from htorch import utils
 
-class ModifiedDataset(Dataset):
-    """
-    Custom Dataset class for modified dataset
-    for the quaternion network.
-    """
-    def __init__(self, file_path):
-        with open(file_path, "rb") as file:
-            data = pickle.load(file)
-        self.data = data
 
-    def __len__(self):
-        return len(self.data)
+def results_dir():
+    """
+    Specify where to save the results.
+    """
+    return os.path.join(pathlib.Path.home(), 'Documents', 'code', 'results')
 
-    def __getitem__(self, index):
-        return self.data[index]
+
+def dataset_dir():
+    """
+    Specify where to save the datasets.
+    """
+    return os.path.join(pathlib.Path.home(), 'Documents', 'code', 'datasets')
 
 
 def data_loader(model_to_run, dataset, batch_size):
     """
-    Data loader function for both qcnn and cnn.
+    Data loader function.
+    Has different conditions for different datasets
+    and both real and quaternion networks.
     """
     if dataset == 'cifar10':
-        data_directory = os.path.join('open_lth_datasets', 'cifar10')
+        data_directory = os.path.join(dataset_dir(), 'cifar10')
 
         train_transform = transforms.Compose([
             transforms.RandomCrop(32, 4),
@@ -48,10 +47,18 @@ def data_loader(model_to_run, dataset, batch_size):
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
         ])
 
-        trainset = torchvision.datasets.CIFAR10(root=data_directory, train=True,
-                download=False, transform=train_transform)
-        testset = torchvision.datasets.CIFAR10(root=data_directory, train=False,
-                download=False, transform=test_transform)
+        trainset = torchvision.datasets.CIFAR10(
+            root=data_directory,
+            train=True,
+            download=False,
+            transform=train_transform
+        )
+        testset = torchvision.datasets.CIFAR10(
+            root=data_directory,
+            train=False,
+            download=False,
+            transform=test_transform
+        )
 
         if model_to_run == 'quaternion':
             trainloader = torch.utils.data.DataLoader(
@@ -84,17 +91,25 @@ def data_loader(model_to_run, dataset, batch_size):
             )
 
     elif dataset == 'mnist':
-        data_directory = os.path.join('open_lth_datasets', 'mnist')
+        data_directory = os.path.join(dataset_dir(), 'mnist')
 
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.1307], std=[0.3081])
         ])
 
-        trainset = torchvision.datasets.MNIST(root=data_directory, train=True,
-                download=False, transform=transform)
-        testset = torchvision.datasets.MNIST(root=data_directory, train=False,
-                download=False, transform=transform)
+        trainset = torchvision.datasets.MNIST(
+            root=data_directory,
+            train=True,
+            download=False,
+            transform=transform
+        )
+        testset = torchvision.datasets.MNIST(
+            root=data_directory,
+            train=False,
+            download=False,
+            transform=transform
+        )
 
         trainloader = torch.utils.data.DataLoader(
             trainset,
@@ -125,10 +140,10 @@ def format_text(input, length=40, heading=True):
     else:
         num_dashes = int((length - len(input) - 4) / 2)
         if heading:
-            return ('\n' + '-'*length + '\n' + '-'*num_dashes + '  ' + input + '  '
-                    + '-'*num_dashes + '\n' + '-'*length + '\n')
+            return ('-'*length + '\n' + '-'*num_dashes + '  ' + input
+                    + '  ' + '-'*num_dashes + '\n' + '-'*length + '\n')
         else:
-            return ('\n' + '-'*num_dashes + '  ' + input + '  '
+            return ('-'*num_dashes + '  ' + input + '  '
                     + '-'*num_dashes + '\n')
 
 
@@ -141,17 +156,19 @@ def display_model(model: nn.Module, output_directory=None):
     table = PrettyTable(["Layers", "Parameters"])
     total_params = 0
     for name, parameter in model.named_parameters():
-        if not parameter.requires_grad: continue
+        if not parameter.requires_grad:
+            continue
         param = parameter.numel()
         table.add_row([name, param])
-        total_params+=param
+        total_params += param
     table.add_row(["Total trainable parameters", total_params])
     print(format_text("Model statistics"))
     print(table)
+    print('\n')
 
     if output_directory:
         file_path = os.path.join(output_directory, 'model_structure.txt')
-        with open (file_path, 'w') as file:
+        with open(file_path, 'w') as file:
             file.write(str(table))
 
 
@@ -163,7 +180,8 @@ def get_trainable_params(model: nn.Module):
     return num_param
 
 
-def train_model(model, trainloader, testloader, optimizer, criterion, num_epochs, device, mini_batch, output_directory=None):
+def train_model(model, trainloader, testloader, optimizer, criterion,
+                num_epochs, device, mini_batch, output_directory=None):
     """
     Function to train a model.
     """
@@ -171,7 +189,8 @@ def train_model(model, trainloader, testloader, optimizer, criterion, num_epochs
     for epoch in range(num_epochs):
         if epoch == 0:
             accuracy = test_model(model, testloader, device)
-            print("ep  {:03d}  loss    {:.3f}  acc  {:.3f}%".format(epoch, 0, accuracy))
+            print("ep  {:03d}  loss    {:.3f}  acc  {:.3f}%".format(epoch,
+                  0, accuracy))
 
         epoch_loss = 0.0
         mini_batch_loss = 0.0
@@ -194,22 +213,23 @@ def train_model(model, trainloader, testloader, optimizer, criterion, num_epochs
 
             if (i + 1) % mini_batch == 0:
                 print('[%d, %5d] loss: %.3f' %
-                    (epoch + 1, i + 1, mini_batch_loss/mini_batch))
+                      (epoch + 1, i + 1, mini_batch_loss/mini_batch))
                 mini_batch_loss = 0.0
 
         # Test accuracy at the end of each epoch
         accuracy = test_model(model, testloader, device)
         log_output.append([epoch + 1, epoch_loss / len(trainloader), accuracy])
 
-        print("ep  {:03d}  loss  {:.3f}  acc  {:.3f}%".format(epoch + 1, epoch_loss / len(trainloader), accuracy))
+        print("ep  {:03d}  loss  {:.3f}  acc  {:.3f}%".format(
+            epoch + 1, epoch_loss / len(trainloader), accuracy))
 
     if output_directory:
         file_path = os.path.join(output_directory, 'logger.csv')
         with open(file_path, 'w', newline="") as file:
             writer = csv.writer(file)
             writer.writerows(log_output)
-    
-    print("\nTraining complete.")
+
+    print("\nTraining complete.\n")
 
 
 def test_model(model, testloader, device):
@@ -228,7 +248,6 @@ def test_model(model, testloader, device):
             correct += (predicted == labels).sum().item()
 
     accuracy = 100 * correct / total
-    
     return accuracy
 
 
@@ -244,9 +263,8 @@ def layer_sparsity(layer: nn.Module):
 
     for name, buffer in layer.named_buffers():
         zeros += torch.sum(buffer == 0).item()
-    
+
     sparsity = 100 * (total - zeros) / total
-    
     return sparsity, zeros, total
 
 
@@ -274,15 +292,17 @@ def sparsity_check(model: nn.Module, output_directory=None):
 
     if output_directory:
         file_path = os.path.join(output_directory, 'sparsity_report.txt')
-        with open (file_path, 'w') as file:
+        with open(file_path, 'w') as file:
             file.write(str(table))
 
-def prune_model(parameters_to_prune, percentage, iterations, model, trainloader, testloader,
-                optimizer, criterion, num_epochs, device, mini_batch, output_directory):
+
+def prune_model(parameters_to_prune, percentage, iterations, model,
+                trainloader, testloader, optimizer, criterion, num_epochs,
+                device, mini_batch, output_directory):
     """
     Function to iteratively prune the given model.
     """
-    iter_percentage = percentage # percentage ** (1 / iterations)
+    iter_percentage = percentage  # percentage ** (1 / iterations)
     iter_percentage = 1 - (1 - percentage) ** (1 / iterations)
 
     for i in range(iterations):
@@ -295,5 +315,6 @@ def prune_model(parameters_to_prune, percentage, iterations, model, trainloader,
             pruning_method=prune.L1Unstructured,
             amount=iter_percentage,
         )
-        train_model(model, trainloader, testloader, optimizer, criterion, num_epochs, device, mini_batch, iter_directory)
+        train_model(model, trainloader, testloader, optimizer, criterion,
+                    num_epochs, device, mini_batch, iter_directory)
         sparsity_check(model, iter_directory)
