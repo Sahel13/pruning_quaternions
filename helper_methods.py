@@ -181,7 +181,8 @@ def get_trainable_params(model: nn.Module):
 
 
 def train_model(model, trainloader, testloader, optimizer, criterion,
-                num_epochs, device, mini_batch, output_directory=None):
+                num_epochs, device, mini_batch,
+                output_directory=None, scheduler=None):
     """
     Function to train a model.
     """
@@ -216,6 +217,9 @@ def train_model(model, trainloader, testloader, optimizer, criterion,
                       (epoch + 1, i + 1, mini_batch_loss/mini_batch))
                 mini_batch_loss = 0.0
 
+        if scheduler:
+            scheduler.step()
+
         # Test accuracy at the end of each epoch
         accuracy = test_model(model, testloader, device)
         log_output.append([epoch + 1, epoch_loss / len(trainloader), accuracy])
@@ -224,17 +228,23 @@ def train_model(model, trainloader, testloader, optimizer, criterion,
             epoch + 1, epoch_loss / len(trainloader), accuracy))
 
     if output_directory:
+        # Save the training log
         file_path = os.path.join(output_directory, 'logger.csv')
         with open(file_path, 'w', newline="") as file:
             writer = csv.writer(file)
             writer.writerows(log_output)
+        # Save the weights
+        weight_path = os.path.join(output_directory,
+                                   f'weights_{model.name()}.pth')
+
+        torch.save(model.state_dict(), weight_path)
 
     print("\nTraining complete.\n")
 
 
 def test_model(model, testloader, device):
     """
-    Function to train a model.
+    Function to test a model.
     """
     correct = 0
     total = 0
@@ -258,10 +268,10 @@ def layer_sparsity(layer: nn.Module):
     zeros = 0
     total = 0
 
-    for name, parameter in layer.named_parameters():
+    for _, parameter in layer.named_parameters():
         total += parameter.numel()
 
-    for name, buffer in layer.named_buffers():
+    for _, buffer in layer.named_buffers():
         zeros += torch.sum(buffer == 0).item()
 
     sparsity = 100 * (total - zeros) / total
@@ -289,6 +299,7 @@ def sparsity_check(model: nn.Module, output_directory=None):
 
     print(format_text("Model Sparsity", heading=False))
     print(table)
+    print('\n')
 
     if output_directory:
         file_path = os.path.join(output_directory, 'sparsity_report.txt')
@@ -298,7 +309,7 @@ def sparsity_check(model: nn.Module, output_directory=None):
 
 def prune_model(parameters_to_prune, percentage, iterations, model,
                 trainloader, testloader, optimizer, criterion, num_epochs,
-                device, mini_batch, output_directory):
+                device, mini_batch, output_directory, scheduler=None):
     """
     Function to iteratively prune the given model.
     """
@@ -316,5 +327,46 @@ def prune_model(parameters_to_prune, percentage, iterations, model,
             amount=iter_percentage,
         )
         train_model(model, trainloader, testloader, optimizer, criterion,
-                    num_epochs, device, mini_batch, iter_directory)
+                    num_epochs, device, mini_batch, iter_directory, scheduler)
         sparsity_check(model, iter_directory)
+
+
+def load_prune_scratch(model, parameters_to_prune, pruned_weight_path,
+                       initial_weight_path, testloader, device):
+    """
+    Function that loads weights to train
+    a pruned model from scratch.
+    """
+    # Initialize the new model in a pruned state
+    # (so that the state_dicts match) and load the state_dict.
+    for module, parameter in parameters_to_prune:
+        prune.identity(module, parameter)
+
+    model.load_state_dict(torch.load(pruned_weight_path))
+    model.to(device)
+
+    # Set the initial weights.
+    initial_weights = torch.load(initial_weight_path, map_location=device)
+    for name, parameter in model.named_parameters():
+
+        # If the parameter was not pruned
+        if name in initial_weights.keys():
+            with torch.no_grad():
+                parameter.data = initial_weights[name]
+
+        # If the parameter was pruned
+        elif name[-5:] == '_orig':
+            with torch.no_grad():
+                parameter.data = initial_weights[name[:-5]]
+
+        # Not sure if this case will ever arise (kept just in case)
+        else:
+            raise ValueError("Parameter was not found.")
+
+    # Do a sample forward pass so that the weights are
+    # computed from weight_orig and weight_mask.
+    dataiter = iter(testloader)
+    images, _ = dataiter.next()
+
+    with torch.no_grad():
+        _ = model(images.to(device))
