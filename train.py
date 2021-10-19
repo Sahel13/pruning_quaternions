@@ -1,46 +1,40 @@
 import os
 import torch
 import helper_methods as H
-# import models.lenet_300_100 as M
-import models.experimentation as M
-# import models.lenet as M
+import models.resnet as M
+from torch.optim.lr_scheduler import MultiStepLR
 
+# Ensure reproducibility
 torch.manual_seed(0)
 
 
 """
 Parameters.
 """
-dataset = 'cifar10'
-model_to_run = 'real'
-model = M.Exp2()
-use_gpu = True
-mini_batch = 1000000
-
-# model = (M.QLeNet_300_100() if model_to_run == 'quaternion'
-#          else M.LeNet_300_100())
-
-# For MNIST
-if dataset == 'mnist':
-    batch_size = 128
-    num_epochs = 40
-    learning_rate = 0.1
-
-# For CIFAR10
-elif dataset == 'cifar10':
-    batch_size = 8
-    num_epochs = 5
-    learning_rate = 0.001
-
-else:
-    raise ValueError("Dataset not known.")
-
+model_to_run = 'quaternion'
 
 # ############ No need to change anything below this ############### #
+
+model = M.Real() if model_to_run == 'real' else M.Quat()
+
+hparams = M.hyper_params()
+tparams = hparams['training']
+
+output_directory = hparams['output_directory']
+dataset = hparams['dataset']
+batch_size = tparams['batch_size']
+num_epochs = tparams['num_epochs']
+learning_rate = tparams['learning_rate']
+milestones = tparams['milestones']
+gamma = tparams['gamma']
+weight_decay = tparams['weight_decay']
+mini_batch = tparams['mini_batch']
+
 
 """
 Train the model.
 """
+use_gpu = True
 device = torch.device("cuda:0" if use_gpu else "cpu")
 model.to(device)
 
@@ -52,7 +46,9 @@ H.display_model(model)
 
 # Train and test the model
 criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9,
+                            weight_decay=weight_decay)
+scheduler = MultiStepLR(optimizer, milestones, gamma)
 
 H.train_model(
     model,
@@ -62,7 +58,8 @@ H.train_model(
     criterion,
     num_epochs,
     device,
-    mini_batch
+    mini_batch,
+    scheduler=scheduler
 )
 
 weight_path = os.path.join(

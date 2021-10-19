@@ -2,5 +2,6 @@
 __pycache__/
 htorch/htorch/__pycache__/
 htorch/htorch_giorgiozannini.egg-info/
-parcollet/core_qnn/__pycache__/
-parcollet/Pytorch_QNN.egg-info/
+test_outputs/
+checks.ipynb
+

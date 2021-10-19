@@ -6,7 +6,6 @@ setuptools.setup(
     author="Giorgio Zannini Quirini",
     author_email="giorgiozannini97@gmail.com",
     description="PyTorch extension to support quaternion-valued tensors",
-    long_description_content_type="text/markdown",
     url="https://github.com/giorgiozannini/hTorch",
     packages=setuptools.find_packages(),
     classifiers=[

@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from htorch import layers
-import core_qnn.quaternion_layers as par
 import torch.nn.functional as F
 
 
