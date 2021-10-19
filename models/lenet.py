@@ -5,12 +5,12 @@ import core_qnn.quaternion_layers as par
 import torch.nn.functional as F
 
 """
-LeNet convolution architecture.
+LeNet architecture.
 """
 
 
 class Real(nn.Module):
-    model_name = 'lenet'
+    model_name = 'lenet_real'
 
     def __init__(self):
         super().__init__()
@@ -62,11 +62,11 @@ class Quat_P(nn.Module):
         return cls.model_name
 
 
-class Quat_H(nn.Module):
+class Quat(nn.Module):
     """
     LeNet architecture using htorch funtions.
     """
-    model_name = 'lenet_h'
+    model_name = 'lenet_quat'
 
     def __init__(self):
         super().__init__()
