@@ -60,7 +60,7 @@ def data_loader(model_to_run, dataset, batch_size):
             transform=test_transform
         )
 
-        if model_to_run == 'quaternion':
+        if model_to_run == 'quat':
             trainloader = torch.utils.data.DataLoader(
                 trainset,
                 batch_size=batch_size,
@@ -206,6 +206,10 @@ def train_model(model, trainloader, testloader, optimizer, criterion,
             outputs = model(images)
             loss = criterion(outputs, labels)
             loss.backward()
+
+            # For gaudet clip gradients to 1.
+            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
             optimizer.step()
 
             # Print training statistics
@@ -217,8 +221,8 @@ def train_model(model, trainloader, testloader, optimizer, criterion,
                       (epoch + 1, i + 1, mini_batch_loss/mini_batch))
                 mini_batch_loss = 0.0
 
-        if scheduler:
-            scheduler.step()
+        # if scheduler:
+        #     scheduler.step()
 
         # Test accuracy at the end of each epoch
         accuracy = test_model(model, testloader, device)
@@ -226,10 +230,15 @@ def train_model(model, trainloader, testloader, optimizer, criterion,
 
         print("ep  {:03d}  loss  {:.3f}  acc  {:.3f}%".format(
             epoch + 1, epoch_loss / len(trainloader), accuracy))
+        
+        if scheduler:
+            # For ReduceLROnPlateau
+            scheduler.step(accuracy)
 
     if output_directory:
         # Save the training log
-        file_path = os.path.join(output_directory, 'logger.csv')
+        file_path = os.path.join(output_directory,
+                                 f'logger_{model.name()}.csv')
         with open(file_path, 'w', newline="") as file:
             writer = csv.writer(file)
             writer.writerows(log_output)

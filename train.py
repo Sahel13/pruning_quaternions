@@ -1,8 +1,10 @@
 import os
 import torch
 import helper_methods as H
-import models.resnet as M
-from torch.optim.lr_scheduler import MultiStepLR
+import models.gaudet as M
+# from torch.optim.lr_scheduler import MultiStepLR
+# from torch.optim.lr_scheduler import LambdaLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 # Ensure reproducibility
 torch.manual_seed(0)
@@ -11,16 +13,13 @@ torch.manual_seed(0)
 """
 Parameters.
 """
-model_to_run = 'quaternion'
-
-# ############ No need to change anything below this ############### #
-
-model = M.Real() if model_to_run == 'real' else M.Quat()
+to_run = [(M.Quat1(), 'quat'), (M.Quat2(), 'real'),
+          (M.Quat3(), 'real')]
 
 hparams = M.hyper_params()
 tparams = hparams['training']
 
-output_directory = hparams['output_directory']
+output_dir_name = hparams['output_directory']
 dataset = hparams['dataset']
 batch_size = tparams['batch_size']
 num_epochs = tparams['num_epochs']
@@ -30,41 +29,45 @@ gamma = tparams['gamma']
 weight_decay = tparams['weight_decay']
 mini_batch = tparams['mini_batch']
 
+for model, model_to_run in to_run:
 
-"""
-Train the model.
-"""
-use_gpu = True
-device = torch.device("cuda:0" if use_gpu else "cpu")
-model.to(device)
+    """
+    Train the model.
+    """
+    use_gpu = True
+    device = torch.device("cuda:1" if use_gpu else "cpu")
+    model.to(device)
 
-# Get the data
-trainloader, testloader = H.data_loader(model_to_run, dataset, batch_size)
+    # Get the data
+    trainloader, testloader = H.data_loader(model_to_run, dataset, batch_size)
 
-# Display model statistics
-H.display_model(model)
+    # Display model statistics
+    # H.display_model(model)
 
-# Train and test the model
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9,
-                            weight_decay=weight_decay)
-scheduler = MultiStepLR(optimizer, milestones, gamma)
+    # Train and test the model
+    criterion = torch.nn.CrossEntropyLoss()
+    # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate,
+    #                             momentum=0.9, weight_decay=weight_decay)
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate,
+                                momentum=0.9)
 
-H.train_model(
-    model,
-    trainloader,
-    testloader,
-    optimizer,
-    criterion,
-    num_epochs,
-    device,
-    mini_batch,
-    scheduler=scheduler
-)
+    # scheduler = LambdaLR(optimizer, schedule_fn)
+    # scheduler = MultiStepLR(optimizer, milestones, gamma)
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', verbose=True)
 
-weight_path = os.path.join(
-    H.results_dir(),
-    "{}_weights_{}.pth".format(dataset, model.name())
-)
+    output_directory = os.path.join(H.results_dir(), output_dir_name)
+    if not os.path.exists(output_directory):
+        os.mkdir(output_directory)
 
-torch.save(model.state_dict(), weight_path)
+    H.train_model(
+        model,
+        trainloader,
+        testloader,
+        optimizer,
+        criterion,
+        num_epochs,
+        device,
+        mini_batch,
+        output_directory,
+        scheduler
+    )
