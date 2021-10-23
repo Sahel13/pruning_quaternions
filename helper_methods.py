@@ -1,14 +1,13 @@
-import csv
 import os
-from prettytable import PrettyTable
+import csv
 import pathlib
+from prettytable import PrettyTable
 
 import torch
 import torch.nn as nn
+import torch.nn.utils.prune as prune
 import torchvision
 import torchvision.transforms as transforms
-
-import torch.nn.utils.prune as prune
 
 from htorch import utils
 
@@ -155,12 +154,14 @@ def display_model(model: nn.Module, output_directory=None):
     """
     table = PrettyTable(["Layers", "Parameters"])
     total_params = 0
+
     for name, parameter in model.named_parameters():
         if not parameter.requires_grad:
             continue
         param = parameter.numel()
         table.add_row([name, param])
         total_params += param
+
     table.add_row(["Total trainable parameters", total_params])
     print(format_text("Model statistics"))
     print(table)
@@ -180,22 +181,23 @@ def get_trainable_params(model: nn.Module):
     return num_param
 
 
-def train_model(model, trainloader, testloader, optimizer, criterion,
-                num_epochs, device, mini_batch,
+def train_model(model, trainloader, testloader, optimizer,
+                criterion, num_epochs, device,
                 output_directory=None, scheduler=None):
     """
     Function to train a model.
     """
     log_output = []
+    best_accuracy = 0.0
     for epoch in range(num_epochs):
         if epoch == 0:
             accuracy = test_model(model, testloader, device)
             print("ep  {:03d}  loss    {:.3f}  acc  {:.3f}%".format(epoch,
                   0, accuracy))
+            best_accuracy = accuracy
 
         epoch_loss = 0.0
-        mini_batch_loss = 0.0
-        for i, data in enumerate(trainloader, 0):
+        for _, data in enumerate(trainloader, 0):
 
             images, labels = data[0].to(device), data[1].to(device)
 
@@ -206,23 +208,9 @@ def train_model(model, trainloader, testloader, optimizer, criterion,
             outputs = model(images)
             loss = criterion(outputs, labels)
             loss.backward()
-
-            # For gaudet clip gradients to 1.
-            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-
             optimizer.step()
 
-            # Print training statistics
-            mini_batch_loss += loss.item()
-            epoch_loss += mini_batch_loss
-
-            if (i + 1) % mini_batch == 0:
-                print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, i + 1, mini_batch_loss/mini_batch))
-                mini_batch_loss = 0.0
-
-        # if scheduler:
-        #     scheduler.step()
+            epoch_loss += loss.item()
 
         # Test accuracy at the end of each epoch
         accuracy = test_model(model, testloader, device)
@@ -230,10 +218,12 @@ def train_model(model, trainloader, testloader, optimizer, criterion,
 
         print("ep  {:03d}  loss  {:.3f}  acc  {:.3f}%".format(
             epoch + 1, epoch_loss / len(trainloader), accuracy))
-        
+
         if scheduler:
-            # For ReduceLROnPlateau
-            scheduler.step(accuracy)
+            scheduler.step()
+        
+        if best_accuracy < accuracy:
+            best_accuracy = accuracy
 
     if output_directory:
         # Save the training log
@@ -242,13 +232,15 @@ def train_model(model, trainloader, testloader, optimizer, criterion,
         with open(file_path, 'w', newline="") as file:
             writer = csv.writer(file)
             writer.writerows(log_output)
+
         # Save the weights
         weight_path = os.path.join(output_directory,
                                    f'weights_{model.name()}.pth')
-
         torch.save(model.state_dict(), weight_path)
 
     print("\nTraining complete.\n")
+
+    return best_accuracy
 
 
 def test_model(model, testloader, device):
