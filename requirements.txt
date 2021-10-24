@@ -10,3 +10,4 @@ torchmetrics
 configparser
 flake8
 prettytable
+matplotlib

@@ -8,25 +8,28 @@ LeNet_300_100 architecture.
 """
 
 
-def hyper_params():
+def std_hparams():
     hparams = {
         "dataset": 'mnist',
-        "output_directory": "18-10_1",
         "training": {
             "batch_size": 128,
-            "num_epochs": 3,
-            "learning_rate": 0.05,
-            "milestones": [],
-            "gamma": 0.1,
-            "weight_decay": 0,
-            "mini_batch": 1000000
+            "num_epochs": 20,
+            "learning_rate": 0.1,
+            "weight_decay": 0
         },
         "pruning": {
-            "iterations": 1,
-            "percentage": 0.2
+            "iterations": 15,
+            "percentage": 0.99
         }
     }
     return hparams
+
+
+def std_lr_scheduler(epochs):
+    if epochs < 11:
+        return 1
+    else:
+        return 0.1
 
 
 class Real(nn.Module):
@@ -57,14 +60,13 @@ class Quat(nn.Module):
         super().__init__()
         self.fc1 = layers.QLinear(196, 75)
         self.fc2 = layers.QLinear(75, 25)
-        self.fc3 = layers.QLinear(25, 10)
-        self.abs = layers.QuaternionToReal(10)
+        self.fc3 = nn.Linear(100, 10)
 
     def forward(self, x):
         x = torch.flatten(x, 1)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = self.abs(self.fc3(x))
+        x = self.fc3(x)
         return x
 
     @classmethod

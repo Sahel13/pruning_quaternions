@@ -146,7 +146,7 @@ def format_text(input, length=40, heading=True):
                     + '-'*num_dashes + '\n')
 
 
-def display_model(model: nn.Module, output_directory=None):
+def display_model(model: nn.Module, output_directory=None, print=True):
     """
     Function to print the structure of the neural
     network model (its constituent layers and the
@@ -163,9 +163,11 @@ def display_model(model: nn.Module, output_directory=None):
         total_params += param
 
     table.add_row(["Total trainable parameters", total_params])
-    print(format_text("Model statistics"))
-    print(table)
-    print('\n')
+
+    if print:
+        print(format_text("Model statistics"))
+        print(table)
+        print('\n')
 
     if output_directory:
         file_path = os.path.join(output_directory, 'model_structure.txt')
@@ -188,13 +190,13 @@ def train_model(model, trainloader, testloader, optimizer,
     Function to train a model.
     """
     log_output = []
-    best_accuracy = 0.0
+    final_accuracy = 0.0
     for epoch in range(num_epochs):
         if epoch == 0:
             accuracy = test_model(model, testloader, device)
             print("ep  {:03d}  loss    {:.3f}  acc  {:.3f}%".format(epoch,
                   0, accuracy))
-            best_accuracy = accuracy
+            final_accuracy = accuracy
 
         epoch_loss = 0.0
         for _, data in enumerate(trainloader, 0):
@@ -221,26 +223,23 @@ def train_model(model, trainloader, testloader, optimizer,
 
         if scheduler:
             scheduler.step()
-        
-        if best_accuracy < accuracy:
-            best_accuracy = accuracy
+
+        final_accuracy = accuracy
 
     if output_directory:
         # Save the training log
-        file_path = os.path.join(output_directory,
-                                 f'logger_{model.name()}.csv')
+        file_path = os.path.join(output_directory, 'logger.csv')
         with open(file_path, 'w', newline="") as file:
             writer = csv.writer(file)
             writer.writerows(log_output)
 
         # Save the weights
-        weight_path = os.path.join(output_directory,
-                                   f'weights_{model.name()}.pth')
+        weight_path = os.path.join(output_directory, 'weights.pth')
         torch.save(model.state_dict(), weight_path)
 
     print("\nTraining complete.\n")
 
-    return best_accuracy
+    return final_accuracy
 
 
 def test_model(model, testloader, device):
@@ -307,14 +306,15 @@ def sparsity_check(model: nn.Module, output_directory=None):
         with open(file_path, 'w') as file:
             file.write(str(table))
 
+    return sparsity
+
 
 def prune_model(parameters_to_prune, percentage, iterations, model,
                 trainloader, testloader, optimizer, criterion, num_epochs,
-                device, mini_batch, output_directory, scheduler=None):
+                device, output_directory, scheduler=None):
     """
     Function to iteratively prune the given model.
     """
-    iter_percentage = percentage  # percentage ** (1 / iterations)
     iter_percentage = 1 - (1 - percentage) ** (1 / iterations)
 
     for i in range(iterations):
@@ -327,9 +327,12 @@ def prune_model(parameters_to_prune, percentage, iterations, model,
             pruning_method=prune.L1Unstructured,
             amount=iter_percentage,
         )
-        train_model(model, trainloader, testloader, optimizer, criterion,
-                    num_epochs, device, mini_batch, iter_directory, scheduler)
-        sparsity_check(model, iter_directory)
+        accuracy = train_model(model, trainloader, testloader, optimizer,
+                               criterion, num_epochs, device, iter_directory,
+                               scheduler)
+        sparsity = sparsity_check(model, iter_directory)
+
+        return (accuracy, sparsity)
 
 
 def load_prune_scratch(model, parameters_to_prune, pruned_weight_path,

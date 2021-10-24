@@ -1,129 +1,143 @@
 import os
+import csv
+import argparse
 
 import torch
 import torch.nn as nn
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import LambdaLR
 
 from htorch import layers
 import helper_methods as H
 import models.lenet_300_100 as M
 
-# Ensure reproducibility
-torch.manual_seed(0)
+parser = argparse.ArgumentParser()
+parser.add_argument('-o', '--output_dir',
+                    required=True,
+                    help="The directory to save the output files.")
+args = parser.parse_args()
 
+out_dir_name = args.output_dir
 
-"""
-Parameters.
-"""
-model_to_run = 'real'
+num_trials = 5
+for trial in range(num_trials):
 
-# ############ No need to change anything below this ############### #
+    for model_to_run in ['real', 'quat']:
 
-model = M.Real() if model_to_run == 'real' else M.Quat()
+        # Load the hyper-parameters
+        hparams = M.std_hparams()
+        dataset = hparams['dataset']
+        tparams = hparams['training']
+        pparams = hparams['pruning']
 
-hparams = M.hyper_params()
-dataset = hparams['dataset']
-output_dir_name = hparams['output_directory']
-tparams = hparams['training']
-pparams = hparams['pruning']
+        batch_size = tparams['batch_size']
+        num_epochs = tparams['num_epochs']
+        learning_rate = tparams['learning_rate']
+        weight_decay = tparams['weight_decay']
 
-batch_size = tparams['batch_size']
-num_epochs = tparams['num_epochs']
-learning_rate = tparams['learning_rate']
-milestones = tparams['milestones']
-gamma = tparams['gamma']
-weight_decay = tparams['weight_decay']
-mini_batch = tparams['mini_batch']
+        pruning_iterations = pparams['iterations']
+        pruning_percentage = pparams['percentage']
 
-pruning_iterations = pparams['iterations']
-pruning_percentage = pparams['percentage']
+        output_directory = os.path.join(H.results_dir(), out_dir_name,
+                                        f'Trial {trial + 1}', model_to_run)
+        if not os.path.exists(output_directory):
+            os.makedirs(output_directory)
 
-use_gpu = True
-device = torch.device("cuda:0" if use_gpu else "cpu")
-model.to(device)
+        # File to save sparsity vs accuracy data for inference.
+        data_file = os.path.join(output_directory, 'acc_data.csv')
 
-output_directory = os.path.join(H.results_dir(), output_dir_name, model_to_run)
-if not os.path.exists(output_directory):
-    os.makedirs(output_directory)
+        pre_train_dir = os.path.join(output_directory, 'Level 0')
+        if not os.path.exists(pre_train_dir):
+            os.mkdir(pre_train_dir)
 
-pre_train_directory = os.path.join(output_directory, 'Level 0')
-if not os.path.exists(pre_train_directory):
-    os.mkdir(pre_train_directory)
+        """
+        Loading data and model.
+        """
+        # Get the data.
+        trainloader, testloader = H.data_loader(model_to_run, dataset,
+                                                batch_size)
 
+        # Get the model.
+        model = M.Real() if model_to_run == 'real' else M.Quat()
 
-"""
-Loading data and model.
-"""
-# Get the data
-trainloader, testloader = H.data_loader(model_to_run, dataset, batch_size)
+        use_gpu = True
+        device = torch.device("cuda:0" if use_gpu else "cpu")
+        model.to(device)
 
-# Loss function and optimizer
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9,
-                            weight_decay=weight_decay)
-scheduler = MultiStepLR(optimizer, milestones, gamma)
+        # Loss function and optimizer
+        criterion = torch.nn.CrossEntropyLoss()
+        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate,
+                                    momentum=0.9, weight_decay=weight_decay)
+        scheduler = LambdaLR(optimizer, M.std_lr_scheduler)
 
-# Display model statistics
-H.display_model(model, pre_train_directory)
+        # Save model statistics
+        H.display_model(model, pre_train_dir, print=False)
 
+        """
+        Pre-training.
+        """
+        print(H.format_text(model_to_run))
+        print(H.format_text('Pre-training'))
 
-"""
-Pretraining.
-"""
-print(H.format_text('Pre-training'))
+        initial_weight_path = os.path.join(pre_train_dir, 'init_weights.pth')
+        weight_path = os.path.join(pre_train_dir, 'weights.pth')
 
-initial_weight_path = os.path.join(output_directory, 'initial_weights.pth')
-weight_path = os.path.join(pre_train_directory, f'weights_{model.name()}.pth')
+        if os.path.exists(weight_path):
+            model.load_state_dict(torch.load(weight_path))
+            print("Weights have been loaded.\n")
+            accuracy = H.test_model(model, testloader, device)
+        else:
+            torch.save(model.state_dict(), initial_weight_path)
+            accuracy = H.train_model(
+                model,
+                trainloader,
+                testloader,
+                optimizer,
+                criterion,
+                num_epochs,
+                device,
+                pre_train_dir,
+                scheduler
+            )
 
-if os.path.exists(weight_path):
-    model.load_state_dict(torch.load(weight_path))
-    print("Weights have been loaded.\n")
-else:
-    torch.save(model.state_dict(), initial_weight_path)
-    H.train_model(
-        model,
-        trainloader,
-        testloader,
-        optimizer,
-        criterion,
-        num_epochs,
-        device,
-        mini_batch,
-        pre_train_directory,
-        scheduler
-    )
+        with open(data_file, 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Sparsity', 'Accuracy'])
+            writer.writerow([100.0, accuracy])
 
+        """
+        Pruning.
+        """
+        parameters_to_prune = []
 
-"""
-Global pruning
-"""
-parameters_to_prune = []
+        for child in model.children():
+            # Only pruning the weights (no biases) of conv and linear layers.
+            if model_to_run == 'quat':
+                weights = ['r_weight', 'i_weight', 'j_weight', 'k_weight']
 
-for child in model.children():
-    # Only pruning the weights (no biases) of conv and linear layers.
-    if model_to_run == 'quaternion':
-        weights = ['r_weight', 'i_weight', 'j_weight', 'k_weight']
+                if (isinstance(child, layers.QConv2d) or
+                        isinstance(child, layers.QLinear)):
+                    for weight in weights:
+                        parameters_to_prune.append((child, weight))
+            else:
+                if (isinstance(child, nn.Conv2d) or
+                        isinstance(child, nn.Linear)):
+                    parameters_to_prune.append((child, 'weight'))
 
-        if (isinstance(child, layers.QConv2d) or
-                isinstance(child, layers.QLinear)):
-            for weight in weights:
-                parameters_to_prune.append((child, weight))
-    else:
-        if isinstance(child, nn.Conv2d) or isinstance(child, nn.Linear):
-            parameters_to_prune.append((child, 'weight'))
+        accuracy, sparsity = H.prune_model(
+            parameters_to_prune,
+            pruning_percentage,
+            pruning_iterations,
+            model,
+            trainloader,
+            testloader,
+            optimizer,
+            criterion,
+            num_epochs,
+            device,
+            output_directory,
+            scheduler
+        )
 
-H.prune_model(
-    parameters_to_prune,
-    pruning_percentage,
-    pruning_iterations,
-    model,
-    trainloader,
-    testloader,
-    optimizer,
-    criterion,
-    num_epochs,
-    device,
-    mini_batch,
-    output_directory,
-    scheduler
-)
+        with open(data_file, 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([sparsity, accuracy])
