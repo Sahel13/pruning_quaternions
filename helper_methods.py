@@ -9,6 +9,10 @@ import torch.nn.utils.prune as prune
 import torchvision
 import torchvision.transforms as transforms
 
+from ignite.metrics import Accuracy, Loss
+from ignite.engine import Events, create_supervised_evaluator
+from ignite.engine import create_supervised_trainer
+
 from htorch import utils
 
 
@@ -146,7 +150,7 @@ def format_text(input, length=40, heading=True):
                     + '-'*num_dashes + '\n')
 
 
-def display_model(model: nn.Module, output_directory=None, print=True):
+def display_model(model: nn.Module, output_directory=None, show=True):
     """
     Function to print the structure of the neural
     network model (its constituent layers and the
@@ -164,7 +168,7 @@ def display_model(model: nn.Module, output_directory=None, print=True):
 
     table.add_row(["Total trainable parameters", total_params])
 
-    if print:
+    if show:
         print(format_text("Model statistics"))
         print(table)
         print('\n')
@@ -183,9 +187,10 @@ def get_trainable_params(model: nn.Module):
     return num_param
 
 
-def train_model(model, trainloader, testloader, optimizer,
-                criterion, num_epochs, device,
-                output_directory=None, scheduler=None):
+def train_model(
+        model, trainloader, testloader, optimizer,
+        criterion, num_epochs, device,
+        output_directory=None, scheduler=None, retrain=False):
     """
     Function to train a model.
     """
@@ -227,19 +232,95 @@ def train_model(model, trainloader, testloader, optimizer,
         final_accuracy = accuracy
 
     if output_directory:
+        if not retrain:
+            file_path = os.path.join(output_directory, 'logger.csv')
+            weight_path = os.path.join(output_directory, 'weights.pth')
+        else:
+            file_path = os.path.join(output_directory, 'logger_retrain.csv')
+            weight_path = os.path.join(output_directory, 'weights_retrain.pth')
+
         # Save the training log
-        file_path = os.path.join(output_directory, 'logger.csv')
-        with open(file_path, 'w', newline="") as file:
+        with open(file_path, 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerows(log_output)
 
         # Save the weights
-        weight_path = os.path.join(output_directory, 'weights.pth')
         torch.save(model.state_dict(), weight_path)
 
     print("\nTraining complete.\n")
 
     return final_accuracy
+
+
+def train_model_ignite(
+        model, trainloader, testloader, optimizer,
+        criterion, num_epochs, device,
+        output_directory=None, scheduler=None, retrain=False):
+    """
+    Function to train a model.
+    """
+    metrics = {
+        "Accuracy": Accuracy(),
+        "Loss": Loss(criterion)
+    }
+
+    trainer = create_supervised_trainer(
+        model, optimizer, criterion, device=device
+    )
+    evaluator = create_supervised_evaluator(
+        model, metrics=metrics, device=device
+    )
+
+    @trainer.on(Events.STARTED)
+    def show_init_accuracy(trainer):
+        evaluator.run(testloader)
+        metrics = evaluator.state.metrics
+
+        epoch_num = trainer.state.epoch
+        accuracy = metrics['Accuracy'] * 100
+        loss = metrics['Loss']
+
+        print(f"ep  {epoch_num:03d}  loss  {loss:.3f}  acc  {accuracy:.2f}%")
+
+    log_output = []
+
+    @trainer.on(Events.EPOCH_COMPLETED)
+    def log_validation_results(trainer):
+        evaluator.run(testloader)
+        metrics = evaluator.state.metrics
+
+        epoch_num = trainer.state.epoch
+        accuracy = metrics['Accuracy'] * 100
+        loss = metrics['Loss']
+
+        print(f"ep  {epoch_num:03d}  loss  {loss:.3f}  acc  {accuracy:.2f}%")
+        log_output.append([epoch_num, loss, accuracy])
+
+    @trainer.on(Events.COMPLETED)
+    def save_state_dict_and_log(trainer):
+        if not output_directory:
+            pass
+        else:
+            if not retrain:
+                file_path = os.path.join(output_directory, 'logger.csv')
+                weight_path = os.path.join(output_directory, 'weights.pth')
+            else:
+                file_path = os.path.join(output_directory,
+                                         'logger_retrain.csv')
+                weight_path = os.path.join(output_directory,
+                                           'weights_retrain.pth')
+
+            # Save the training log
+            with open(file_path, 'w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerows(log_output)
+
+            # Save the weights
+            torch.save(model.state_dict(), weight_path)
+
+    trainer.run(trainloader, num_epochs)
+
+    return log_output[-1][-1]
 
 
 def test_model(model, testloader, device):
@@ -311,12 +392,10 @@ def sparsity_check(model: nn.Module, output_directory=None):
 
 def prune_model(parameters_to_prune, percentage, iterations, model,
                 trainloader, testloader, optimizer, criterion, num_epochs,
-                device, output_directory, scheduler=None):
+                device, output_directory, output_file, scheduler=None):
     """
     Function to iteratively prune the given model.
     """
-    iter_percentage = 1 - (1 - percentage) ** (1 / iterations)
-
     for i in range(iterations):
         print(format_text("Pruning iteration {:02d}".format(i + 1)))
         iter_directory = os.path.join(output_directory, f"Level {i + 1}")
@@ -325,18 +404,21 @@ def prune_model(parameters_to_prune, percentage, iterations, model,
         prune.global_unstructured(
             parameters_to_prune,
             pruning_method=prune.L1Unstructured,
-            amount=iter_percentage,
+            amount=percentage,
         )
         accuracy = train_model(model, trainloader, testloader, optimizer,
                                criterion, num_epochs, device, iter_directory,
                                scheduler)
         sparsity = sparsity_check(model, iter_directory)
 
-        return (accuracy, sparsity)
+        with open(output_file, 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([sparsity, accuracy])
 
 
-def load_prune_scratch(model, parameters_to_prune, pruned_weight_path,
-                       initial_weight_path, testloader, device):
+def load_pruned_model(
+        model, parameters_to_prune, pruned_weight_path,
+        testloader, device, initial_weight_path=None):
     """
     Function that loads weights to train
     a pruned model from scratch.
@@ -350,22 +432,23 @@ def load_prune_scratch(model, parameters_to_prune, pruned_weight_path,
     model.to(device)
 
     # Set the initial weights.
-    initial_weights = torch.load(initial_weight_path, map_location=device)
-    for name, parameter in model.named_parameters():
+    if initial_weight_path:
+        initial_weights = torch.load(initial_weight_path, map_location=device)
+        for name, parameter in model.named_parameters():
 
-        # If the parameter was not pruned
-        if name in initial_weights.keys():
-            with torch.no_grad():
-                parameter.data = initial_weights[name]
+            # If the parameter was not pruned
+            if name in initial_weights.keys():
+                with torch.no_grad():
+                    parameter.data = initial_weights[name]
 
-        # If the parameter was pruned
-        elif name[-5:] == '_orig':
-            with torch.no_grad():
-                parameter.data = initial_weights[name[:-5]]
+            # If the parameter was pruned
+            elif name[-5:] == '_orig':
+                with torch.no_grad():
+                    parameter.data = initial_weights[name[:-5]]
 
-        # Not sure if this case will ever arise (kept just in case)
-        else:
-            raise ValueError("Parameter was not found.")
+            # Not sure if this case will ever arise (kept just in case)
+            else:
+                raise ValueError("Parameter was not found.")
 
     # Do a sample forward pass so that the weights are
     # computed from weight_orig and weight_mask.
@@ -374,3 +457,32 @@ def load_prune_scratch(model, parameters_to_prune, pruned_weight_path,
 
     with torch.no_grad():
         _ = model(images.to(device))
+
+
+def retrain_pruned_model(
+        parameters_to_prune, iterations, model,
+        trainloader, testloader, optimizer, criterion, num_epochs,
+        device, output_directory, output_file, scheduler=None):
+    """
+    Function to retrain pruned model from scratch.
+    """
+    for i in range(iterations):
+        print(format_text("Retrain iteration {:02d}".format(i + 1)))
+        iter_directory = os.path.join(output_directory, f"Level {i + 1}")
+
+        pruned_weight_path = os.path.join(iter_directory, 'weights.pth')
+        initial_weight_path = os.path.join(output_directory, 'Level 0',
+                                           'init_weights.pth')
+        load_pruned_model(
+            model, parameters_to_prune, pruned_weight_path,
+            testloader, device, initial_weight_path
+        )
+
+        accuracy = train_model(
+            model, trainloader, testloader, optimizer, criterion,
+            num_epochs, device, iter_directory, scheduler, retrain=True)
+        sparsity = sparsity_check(model)
+
+        with open(output_file, 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([sparsity, accuracy])
