@@ -12,6 +12,7 @@ import torchvision.transforms as transforms
 from ignite.metrics import Accuracy, Loss
 from ignite.engine import Events, create_supervised_evaluator
 from ignite.engine import create_supervised_trainer
+from ignite.handlers.param_scheduler import LRScheduler
 
 from htorch import utils
 
@@ -281,6 +282,9 @@ def train_model_ignite(
         loss = metrics['Loss']
 
         print(f"ep  {epoch_num:03d}  loss  {loss:.3f}  acc  {accuracy:.2f}%")
+    
+    scheduler_engine = LRScheduler(scheduler)
+    trainer.add_event_handler(Events.ITERATION_COMPLETED, scheduler_engine)
 
     log_output = []
 

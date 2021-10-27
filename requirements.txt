@@ -11,4 +11,9 @@ configparser
 flake8
 prettytable
 torchsummary
+pytorch-ignite
+jupyter
+pandas
 matplotlib
+seaborn
+
