@@ -4,10 +4,16 @@ import argparse
 
 import torch
 import torch.nn as nn
-from torch.optim.lr_scheduler import LambdaLR
+# from torch.optim.lr_scheduler import LambdaLR
+# from torch.optim.lr_scheduler import OneCycleLR
 
 from htorch import layers
-import helper_methods as H
+
+from utils.misc import results_dir, format_text
+from utils.misc import display_model, data_loader
+from utils.train import train_model_ignite, test_model
+from utils.prune import prune_model, retrain_pruned_model
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-m', '--model',
@@ -17,10 +23,14 @@ parser.add_argument('-m', '--model',
 parser.add_argument('-o', '--output_dir',
                     required=True,
                     help="The directory to save the output files.")
+parser.add_argument('-g', '--gpu',
+                    default='0',
+                    help="Which gpu to use for training.")
 args = parser.parse_args()
 
 out_dir_name = args.output_dir
 architecture = args.model
+gpu = args.gpu
 
 if architecture == 'lenet_300_100':
     import models.lenet_300_100 as M
@@ -52,7 +62,7 @@ for trial in range(num_trials):
         pruning_iterations = pparams['iterations']
         pruning_percentage = pparams['percentage']
 
-        output_directory = os.path.join(H.results_dir(), out_dir_name,
+        output_directory = os.path.join(results_dir(), out_dir_name,
                                         f'Trial {trial + 1}', model_to_run)
         if not os.path.exists(output_directory):
             os.makedirs(output_directory)
@@ -69,31 +79,36 @@ for trial in range(num_trials):
         Loading data and model.
         """
         # Get the data.
-        trainloader, testloader = H.data_loader(model_to_run, dataset,
-                                                batch_size)
+        trainloader, testloader = data_loader(model_to_run, dataset,
+                                              batch_size)
 
         # Get the model.
         model = M.Real() if model_to_run == 'real' else M.Quat()
 
         use_gpu = True
-        device = torch.device("cuda:1" if use_gpu else "cpu")
+        device = torch.device(f'cuda:{gpu}' if use_gpu else 'cpu')
         model.to(device)
 
         # Loss function and optimizer
         criterion = torch.nn.CrossEntropyLoss()
+        optimizer = torch.optim.Adam(model.parameters(), learning_rate)
         # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate,
         #                             momentum=0.9, weight_decay=weight_decay)
-        optimizer = torch.optim.Adam(model.parameters(), learning_rate)
-        scheduler = LambdaLR(optimizer, M.std_lr_scheduler)
+
+        scheduler = None
+        # scheduler = LambdaLR(optimizer, M.std_lr_scheduler)
+        # scheduler = LambdaLR(optimizer, M.std_lr_scheduler)
+        # scheduler = OneCycleLR(optimizer, max_lr=2e-3,
+        #                        total_steps=num_epochs, pct_start=0.25)
 
         # Save model statistics
-        H.display_model(model, pre_train_dir, show=False)
+        display_model(model, pre_train_dir, show=False)
 
         """
         Pre-training.
         """
-        print(H.format_text(model_to_run))
-        print(H.format_text('Pre-training'))
+        print(format_text(model_to_run))
+        print(format_text('Pre-training'))
 
         initial_weight_path = os.path.join(pre_train_dir, 'init_weights.pth')
         weight_path = os.path.join(pre_train_dir, 'weights.pth')
@@ -101,10 +116,10 @@ for trial in range(num_trials):
         if os.path.exists(weight_path):
             model.load_state_dict(torch.load(weight_path))
             print("Weights have been loaded.\n")
-            accuracy = H.test_model(model, testloader, device)
+            accuracy = test_model(model, testloader, device)
         else:
             torch.save(model.state_dict(), initial_weight_path)
-            accuracy = H.train_model(
+            accuracy = train_model_ignite(
                 model,
                 trainloader,
                 testloader,
@@ -143,7 +158,7 @@ for trial in range(num_trials):
                         isinstance(child, nn.Linear)):
                     parameters_to_prune.append((child, 'weight'))
 
-        H.prune_model(
+        prune_model(
             parameters_to_prune,
             pruning_percentage,
             pruning_iterations,
@@ -159,7 +174,7 @@ for trial in range(num_trials):
             scheduler
         )
 
-        H.retrain_pruned_model(
+        retrain_pruned_model(
             parameters_to_prune,
             pruning_iterations,
             model,

@@ -63,12 +63,18 @@ class Real(nn.Module):
 class Quat(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv11 = layers.QConv2d(1, 16, kernel_size=3, stride=1, padding=1)
-        self.conv12 = layers.QConv2d(16, 16, kernel_size=3, stride=1, padding=1)
-        self.conv21 = layers.QConv2d(16, 32, kernel_size=3, stride=1, padding=1)
-        self.conv22 = layers.QConv2d(32, 32, kernel_size=3, stride=1, padding=1)
-        self.conv31 = layers.QConv2d(32, 64, kernel_size=3, stride=1, padding=1)
-        self.conv32 = layers.QConv2d(64, 64, kernel_size=3, stride=1, padding=1)
+        self.conv11 = layers.QConv2d(1, 16, kernel_size=3,
+                                     stride=1, padding=1)
+        self.conv12 = layers.QConv2d(16, 16, kernel_size=3,
+                                     stride=1, padding=1)
+        self.conv21 = layers.QConv2d(16, 32, kernel_size=3,
+                                     stride=1, padding=1)
+        self.conv22 = layers.QConv2d(32, 32, kernel_size=3,
+                                     stride=1, padding=1)
+        self.conv31 = layers.QConv2d(32, 64, kernel_size=3,
+                                     stride=1, padding=1)
+        self.conv32 = layers.QConv2d(64, 64, kernel_size=3,
+                                     stride=1, padding=1)
         self.pool = nn.MaxPool2d(2, 2)
         self.fc1 = layers.QLinear(64 * 4 * 4, 64)
         self.fc2 = layers.QLinear(64, 64)

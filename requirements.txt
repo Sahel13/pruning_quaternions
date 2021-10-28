@@ -16,4 +16,3 @@ jupyter
 pandas
 matplotlib
 seaborn
-
