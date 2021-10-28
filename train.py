@@ -3,7 +3,7 @@ import argparse
 import numpy
 
 import torch
-from torch.optim.lr_scheduler import LambdaLR
+from torch.optim.lr_scheduler import LambdaLR, OneCycleLR
 
 import helper_methods as H
 
@@ -70,12 +70,11 @@ for model_to_run in ['real', 'quat']:
     criterion = torch.nn.CrossEntropyLoss()
     # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate,
     #                             momentum=0.9, weight_decay=weight_decay)
-    if model_to_run == 'real':
-        optimizer = torch.optim.Adam(model.parameters(), learning_rate)
-    else:
-        optimizer = torch.optim.Adam(model.parameters(), learning_rate/2)
+    optimizer = torch.optim.Adam(model.parameters(), learning_rate)
 
     scheduler = LambdaLR(optimizer, M.std_lr_scheduler)
+    # scheduler = OneCycleLR(optimizer, max_lr=2e-3, total_steps=num_epochs,
+    #                        pct_start=0.25)
 
     # Save model statistics
     H.display_model(model, output_directory, show=False)

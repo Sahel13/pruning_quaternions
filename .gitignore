@@ -1,6 +1,5 @@
 .vscode/
 __pycache__/
-htorch/__pycache__/
 checks.ipynb
 .ipynb_checkpoints/
 quaternion_lth.egg-info/

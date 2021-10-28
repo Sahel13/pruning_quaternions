@@ -272,28 +272,18 @@ def train_model_ignite(
         model, metrics=metrics, device=device
     )
 
-    @trainer.on(Events.STARTED)
-    def show_init_accuracy(trainer):
-        evaluator.run(testloader)
-        metrics = evaluator.state.metrics
-
-        epoch_num = trainer.state.epoch
-        accuracy = metrics['Accuracy'] * 100
-        loss = metrics['Loss']
-
-        print(f"ep  {epoch_num:03d}  loss  {loss:.3f}  acc  {accuracy:.2f}%")
-    
-    scheduler_engine = LRScheduler(scheduler)
-    trainer.add_event_handler(Events.ITERATION_COMPLETED, scheduler_engine)
+    if scheduler:
+        scheduler_engine = LRScheduler(scheduler, save_history=True)
+        trainer.add_event_handler(Events.EPOCH_COMPLETED, scheduler_engine)
 
     log_output = []
 
-    @trainer.on(Events.EPOCH_COMPLETED)
-    def log_validation_results(trainer):
+    @trainer.on(Events.STARTED | Events.EPOCH_COMPLETED)
+    def log_validation_results(engine):
         evaluator.run(testloader)
         metrics = evaluator.state.metrics
 
-        epoch_num = trainer.state.epoch
+        epoch_num = engine.state.epoch
         accuracy = metrics['Accuracy'] * 100
         loss = metrics['Loss']
 
@@ -301,7 +291,7 @@ def train_model_ignite(
         log_output.append([epoch_num, loss, accuracy])
 
     @trainer.on(Events.COMPLETED)
-    def save_state_dict_and_log(trainer):
+    def save_state_dict_and_log(engine):
         if not output_directory:
             pass
         else:
