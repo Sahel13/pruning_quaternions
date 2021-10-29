@@ -2,6 +2,8 @@ import os
 import csv
 
 import torch
+# from torch.optim.lr_scheduler import LambdaLR
+from torch.optim.lr_scheduler import OneCycleLR
 
 from ignite.metrics import Accuracy, Loss
 from ignite.engine import Events, create_supervised_evaluator
@@ -96,7 +98,7 @@ def train_model(
 def train_model_ignite(
         model, trainloader, testloader, optimizer,
         criterion, num_epochs, device,
-        output_directory=None, scheduler=None, retrain=False):
+        output_directory=None, lr_scheduler=False, retrain=False):
     """
     Function to train a model using the new ignite library.
     """
@@ -112,8 +114,10 @@ def train_model_ignite(
         model, metrics=metrics, device=device
     )
 
-    if scheduler:
-        scheduler_engine = LRScheduler(scheduler, save_history=True)
+    if lr_scheduler:
+        scheduler = OneCycleLR(optimizer, max_lr=2e-3,
+                               total_steps=num_epochs, pct_start=0.25)
+        scheduler_engine = LRScheduler(scheduler)
         trainer.add_event_handler(Events.EPOCH_COMPLETED, scheduler_engine)
 
     log_output = []

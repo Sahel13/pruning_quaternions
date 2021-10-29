@@ -61,10 +61,14 @@ def sparsity_check(model: nn.Module, output_directory=None, show=False):
 
 def prune_model(parameters_to_prune, percentage, iterations, model,
                 trainloader, testloader, optimizer, criterion, num_epochs,
-                device, output_directory, output_file, scheduler=None):
+                device, output_directory, output_file, lr_scheduler=False):
     """
     Function to iteratively prune the given model.
     """
+    prev_acc = 100.0
+    curr_acc = 100.0
+    acc_threshold = 30.0
+
     for i in range(iterations):
         print(format_text("Pruning iteration {:02d}".format(i + 1)))
         iter_directory = os.path.join(output_directory, f"Level {i + 1}")
@@ -78,13 +82,21 @@ def prune_model(parameters_to_prune, percentage, iterations, model,
 
         accuracy = train_model_ignite(
             model, trainloader, testloader, optimizer,
-            criterion, num_epochs, device, iter_directory, scheduler)
+            criterion, num_epochs, device, iter_directory, lr_scheduler
+        )
 
         sparsity = sparsity_check(model, iter_directory)
 
         with open(output_file, 'a', newline='') as file:
             writer = csv.writer(file)
             writer.writerow([sparsity, accuracy])
+
+        # Stop pruning if accuracy is bad (to prevent wasting time).
+        curr_acc = accuracy
+        prev_acc = curr_acc
+
+        if curr_acc < acc_threshold and prev_acc < acc_threshold:
+            break
 
 
 def load_pruned_model(
@@ -133,10 +145,14 @@ def load_pruned_model(
 def retrain_pruned_model(
         parameters_to_prune, iterations, model,
         trainloader, testloader, optimizer, criterion, num_epochs,
-        device, output_directory, output_file, scheduler=None):
+        device, output_directory, output_file, lr_scheduler=False):
     """
     Function to retrain pruned model from scratch.
     """
+    prev_acc = 100.0
+    curr_acc = 100.0
+    acc_threshold = 30.0
+
     for i in range(iterations):
         print(format_text("Retrain iteration {:02d}".format(i + 1)))
         iter_directory = os.path.join(output_directory, f"Level {i + 1}")
@@ -151,9 +167,17 @@ def retrain_pruned_model(
 
         accuracy = train_model_ignite(
             model, trainloader, testloader, optimizer, criterion,
-            num_epochs, device, iter_directory, scheduler, retrain=True)
+            num_epochs, device, iter_directory, lr_scheduler, retrain=True
+        )
         sparsity = sparsity_check(model)
 
         with open(output_file, 'a', newline='') as file:
             writer = csv.writer(file)
             writer.writerow([sparsity, accuracy])
+
+        # Stop retraining if accuracy is bad (to prevent wasting time).
+        curr_acc = accuracy
+        prev_acc = curr_acc
+
+        if curr_acc < acc_threshold and prev_acc < acc_threshold:
+            break

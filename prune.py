@@ -4,8 +4,6 @@ import argparse
 
 import torch
 import torch.nn as nn
-# from torch.optim.lr_scheduler import LambdaLR
-# from torch.optim.lr_scheduler import OneCycleLR
 
 from htorch import layers
 
@@ -26,11 +24,15 @@ parser.add_argument('-o', '--output_dir',
 parser.add_argument('-g', '--gpu',
                     default='0',
                     help="Which gpu to use for training.")
+parser.add_argument('-lrs', '--lr_scheduler',
+                    action='store_true',
+                    help="Whether to use the learning rate scheduler.")
 args = parser.parse_args()
 
 out_dir_name = args.output_dir
 architecture = args.model
 gpu = args.gpu
+lr_scheduler = args.lr_scheduler
 
 if architecture == 'lenet_300_100':
     import models.lenet_300_100 as M
@@ -95,12 +97,6 @@ for trial in range(num_trials):
         # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate,
         #                             momentum=0.9, weight_decay=weight_decay)
 
-        scheduler = None
-        # scheduler = LambdaLR(optimizer, M.std_lr_scheduler)
-        # scheduler = LambdaLR(optimizer, M.std_lr_scheduler)
-        # scheduler = OneCycleLR(optimizer, max_lr=2e-3,
-        #                        total_steps=num_epochs, pct_start=0.25)
-
         # Save model statistics
         display_model(model, pre_train_dir, show=False)
 
@@ -128,7 +124,7 @@ for trial in range(num_trials):
                 num_epochs,
                 device,
                 pre_train_dir,
-                scheduler
+                lr_scheduler
             )
 
         for item in [data_file, retrain_data]:
@@ -171,7 +167,7 @@ for trial in range(num_trials):
             device,
             output_directory,
             data_file,
-            scheduler
+            lr_scheduler
         )
 
         retrain_pruned_model(
@@ -186,5 +182,5 @@ for trial in range(num_trials):
             device,
             output_directory,
             retrain_data,
-            scheduler
+            lr_scheduler
         )

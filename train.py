@@ -3,8 +3,6 @@ import argparse
 import numpy
 
 import torch
-# from torch.optim.lr_scheduler import LambdaLR
-# from torch.optim.lr_scheduler import OneCycleLR
 
 from utils.misc import results_dir, format_text
 from utils.misc import display_model, data_loader
@@ -25,11 +23,15 @@ parser.add_argument('-o', '--output_dir',
 parser.add_argument('-g', '--gpu',
                     default='0',
                     help="Which gpu to use for training.")
+parser.add_argument('-lrs', '--lr_scheduler',
+                    action='store_true',
+                    help="Whether to use the learning rate scheduler.")
 args = parser.parse_args()
 
 out_dir_name = args.output_dir
 architecture = args.model
 gpu = args.gpu
+lr_scheduler = args.lr_scheduler
 
 if architecture == 'lenet_300_100':
     import models.lenet_300_100 as M
@@ -79,11 +81,6 @@ for model_to_run in ['real', 'quat']:
     # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate,
     #                             momentum=0.9, weight_decay=weight_decay)
 
-    scheduler = None
-    # scheduler = LambdaLR(optimizer, M.std_lr_scheduler)
-    # scheduler = OneCycleLR(optimizer, max_lr=2e-3,
-    #                        total_steps=num_epochs, pct_start=0.25)
-
     # Save model statistics
     display_model(model, output_directory, show=False)
 
@@ -103,5 +100,5 @@ for model_to_run in ['real', 'quat']:
         num_epochs,
         device,
         output_directory,
-        scheduler
+        lr_scheduler
     )
