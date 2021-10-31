@@ -8,52 +8,27 @@ Resnet architecture.
 """
 
 
-def hyper_params():
-    hparams = {
-        "dataset": 'cifar10',
-        "output_directory": "lr_resnet",
-        "training": {
-            "batch_size": 128,
-            "num_epochs": 80,
-            "learning_rate": 0.1,
-            "milestones": [80, 120],
-            "gamma": 0.1,
-            "weight_decay": 1e-4,
-            "mini_batch": 1000000
-        },
-        "pruning": {
-            "iterations": 10,
-            "percentage": 0.96
-        }
-    }
-    return hparams
-
-
 def std_hparams():
     hparams = {
         "dataset": 'cifar10',
-        "output_directory": "lr_resnet",
         "training": {
             "batch_size": 128,
-            "num_epochs": 182,
-            "learning_rate": 0.1,
-            "weight_decay": 2e-4
+            "num_epochs": 80,
+            "learning_rate": 1e-2,
+            "optimizer": "sgd",
+            "momentum": 0.9,
+            "weight_decay": 1e-4
         },
         "pruning": {
-            "iterations": 10,
-            "percentage": 0.96
+            "iterations": 20,
+            "percentage": 0.2
         }
     }
     return hparams
 
 
 def std_lr_scheduler(epochs):
-    if epochs < 91:
-        return 1
-    if epochs < 136:
-        return 0.1
-    else:
-        return 0.01
+    return 1
 
 
 class Block(nn.Module):
@@ -96,8 +71,6 @@ class Real(nn.Module):
     Code from open_lth repository.
     Copyright (c) Facebook, Inc. and its affiliates.
     """
-    model_name = 'resnet_real'
-
     def __init__(self):
         super().__init__()
         num_segments = 3
@@ -131,10 +104,6 @@ class Real(nn.Module):
         x = torch.flatten(x, 1)
         x = self.fc(x)
         return x
-
-    @classmethod
-    def name(cls):
-        return cls.model_name
 
 
 class Quat_Block(nn.Module):
@@ -175,8 +144,6 @@ class Quat(nn.Module):
     """
     The fourth channel is grayscale.
     """
-    model_name = 'resnet_quat1'
-
     def __init__(self):
         super().__init__()
         num_segments = 3
@@ -201,8 +168,7 @@ class Quat(nn.Module):
         self.blocks = nn.Sequential(*blocks)
 
         # Final fc layer.
-        self.fc = layers.QLinear(architecture[-1][0], 10)
-        self.abs = layers.QuaternionToReal(10)
+        self.fc = nn.Linear(architecture[-1][0] * 4, 10)
 
     def forward(self, x):
         x = F.relu(self.bn(self.conv(x)))
@@ -210,19 +176,13 @@ class Quat(nn.Module):
         x = F.avg_pool2d(x, x.size()[3])
         x = torch.flatten(x, 1)
         x = self.fc(x)
-        return self.abs(x)
-
-    @classmethod
-    def name(cls):
-        return cls.model_name
+        return x
 
 
-class Quat2(nn.Module):
+class Quat_4(nn.Module):
     """
     The fourth channel is learned.
     """
-    model_name = 'resnet_quat2'
-
     def __init__(self):
         super().__init__()
         num_segments = 3
@@ -261,7 +221,3 @@ class Quat2(nn.Module):
         x = torch.flatten(x, 1)
         x = self.fc(x)
         return self.abs(x)
-
-    @classmethod
-    def name(cls):
-        return cls.model_name
