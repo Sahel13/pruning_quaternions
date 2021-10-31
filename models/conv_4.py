@@ -15,7 +15,7 @@ def std_hparams():
             "batch_size": 60,
             "num_epochs": 40,
             "learning_rate": 3e-4,
-            "weight_decay": None
+            "optimizer": "adam"
         },
         "pruning": {
             "iterations": 20,
@@ -58,11 +58,15 @@ class Real(nn.Module):
 class Quat(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv11 = layers.QConv2d(1, 16, kernel_size=3, stride=1, padding=1)
-        self.conv12 = layers.QConv2d(16, 16, kernel_size=3, stride=1, padding=1)
+        self.conv11 = layers.QConv2d(1, 16, kernel_size=3,
+                                     stride=1, padding=1)
+        self.conv12 = layers.QConv2d(16, 16, kernel_size=3,
+                                     stride=1, padding=1)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv21 = layers.QConv2d(16, 32, kernel_size=3, stride=1, padding=1)
-        self.conv22 = layers.QConv2d(32, 32, kernel_size=3, stride=1, padding=1)
+        self.conv21 = layers.QConv2d(16, 32, kernel_size=3,
+                                     stride=1, padding=1)
+        self.conv22 = layers.QConv2d(32, 32, kernel_size=3,
+                                     stride=1, padding=1)
         self.fc1 = layers.QLinear(32 * 8 * 8, 64)
         self.fc2 = layers.QLinear(64, 64)
         self.fc3 = nn.Linear(256, 10)

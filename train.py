@@ -54,7 +54,11 @@ for model_to_run in ['real', 'quat']:
     batch_size = tparams['batch_size']
     num_epochs = tparams['num_epochs']
     learning_rate = tparams['learning_rate']
-    weight_decay = tparams['weight_decay']
+    optimizer = tparams['optimizer']
+
+    if optimizer == 'sgd':
+        momentum = tparams['momentum']
+        weight_decay = tparams['weight_decay']
 
     output_directory = os.path.join(results_dir(), out_dir_name,
                                     model_to_run)
@@ -77,9 +81,14 @@ for model_to_run in ['real', 'quat']:
 
     # Loss function and optimizer
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), learning_rate)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate,
-    #                             momentum=0.9, weight_decay=weight_decay)
+
+    if optimizer == 'adam':
+        optimizer = torch.optim.Adam(model.parameters(), learning_rate)
+    else:
+        optimizer = torch.optim.SGD(
+            model.parameters(), lr=learning_rate,
+            momentum=momentum, weight_decay=weight_decay
+        )
 
     # Save model statistics
     display_model(model, output_directory, show=False)

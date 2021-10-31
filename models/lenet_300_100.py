@@ -15,7 +15,7 @@ def std_hparams():
             "batch_size": 60,
             "num_epochs": 40,
             "learning_rate": 1.2e-3,
-            "weight_decay": None
+            "optimizer": "adam"
         },
         "pruning": {
             "iterations": 20,
