@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.utils.prune as prune
 
-from utils.misc import format_text
+from utils.misc import format_text, get_trainable_params
 from utils.train import train_model_ignite
 
 
@@ -36,7 +36,8 @@ def sparsity_check(model: nn.Module, output_directory=None, show=False):
     total = 0
 
     for layer_name, layer in model.named_modules():
-        if layer_name not in ['', 'pool', 'abs']:
+        if (layer_name not in ['', 'pool', 'abs']
+                and layer_name[-8:] != 'shortcut'):
             module_sparsity, layer_zeros, layer_total = layer_sparsity(layer)
             zeros += layer_zeros
             total += layer_total
@@ -56,6 +57,18 @@ def sparsity_check(model: nn.Module, output_directory=None, show=False):
         with open(file_path, 'w') as file:
             file.write(str(table))
 
+    return sparsity
+
+
+def new_sparsity_fn(model: nn.Module):
+    total = get_trainable_params(model)
+
+    pruned_params = 0
+    for name, buffer in model.named_buffers():
+        if name[-5:] == '_mask':
+            pruned_params += torch.sum(buffer == 0).item()
+
+    sparsity = 100 * (total - pruned_params) / total
     return sparsity
 
 
@@ -85,7 +98,7 @@ def prune_model(parameters_to_prune, percentage, iterations, model,
             criterion, num_epochs, device, iter_directory, lr_scheduler
         )
 
-        sparsity = sparsity_check(model, iter_directory)
+        sparsity = new_sparsity_fn(model)
 
         with open(output_file, 'a', newline='') as file:
             writer = csv.writer(file)
@@ -169,7 +182,7 @@ def retrain_pruned_model(
             model, trainloader, testloader, optimizer, criterion,
             num_epochs, device, iter_directory, lr_scheduler, retrain=True
         )
-        sparsity = sparsity_check(model)
+        sparsity = new_sparsity_fn(model)
 
         with open(output_file, 'a', newline='') as file:
             writer = csv.writer(file)

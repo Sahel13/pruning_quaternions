@@ -16,7 +16,8 @@ from utils.prune import prune_model, retrain_pruned_model
 parser = argparse.ArgumentParser()
 parser.add_argument('-m', '--model',
                     required=True,
-                    choices=['lenet_300_100', 'conv_2', 'conv_4', 'conv_6'],
+                    choices=['lenet_300_100', 'conv_2', 'conv_4', 'conv_6',
+                             'resnet'],
                     help="The model architecture to run.")
 parser.add_argument('-o', '--output_dir',
                     required=True,
@@ -42,6 +43,8 @@ elif architecture == 'conv_4':
     import models.conv_4 as M
 elif architecture == 'conv_6':
     import models.conv_6 as M
+elif architecture == 'resnet':
+    import models.resnet as M
 else:
     raise ValueError("That is not a valid model.")
 
@@ -59,7 +62,12 @@ for trial in range(num_trials):
         batch_size = tparams['batch_size']
         num_epochs = tparams['num_epochs']
         learning_rate = tparams['learning_rate']
-        weight_decay = tparams['weight_decay']
+
+        optimizer = tparams['optimizer']
+
+        if optimizer == 'sgd':
+            momentum = tparams['momentum']
+            weight_decay = tparams['weight_decay']
 
         pruning_iterations = pparams['iterations']
         pruning_percentage = pparams['percentage']
@@ -93,9 +101,14 @@ for trial in range(num_trials):
 
         # Loss function and optimizer
         criterion = torch.nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), learning_rate)
-        # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate,
-        #                             momentum=0.9, weight_decay=weight_decay)
+
+        if optimizer == 'adam':
+            optimizer = torch.optim.Adam(model.parameters(), learning_rate)
+        else:
+            optimizer = torch.optim.SGD(
+                model.parameters(), lr=learning_rate,
+                momentum=momentum, weight_decay=weight_decay
+            )
 
         # Save model statistics
         display_model(model, pre_train_dir, show=False)
@@ -138,21 +151,22 @@ for trial in range(num_trials):
         """
         parameters_to_prune = []
 
-        for child in model.children():
+        for name, layer in model.named_modules():
             # Only pruning the weights (no biases) of conv and linear layers.
             if model_to_run == 'quat':
                 weights = ['r_weight', 'i_weight', 'j_weight', 'k_weight']
 
-                if (isinstance(child, layers.QConv2d) or
-                        isinstance(child, layers.QLinear)):
+                if (isinstance(layer, layers.QConv2d) or
+                        isinstance(layer, layers.QLinear)):
                     for weight in weights:
-                        parameters_to_prune.append((child, weight))
-                elif isinstance(child, nn.Linear):
-                    parameters_to_prune.append((child, 'weight'))
+                        parameters_to_prune.append((layer, weight))
+                elif isinstance(layer, nn.Linear):
+                    parameters_to_prune.append((layer, 'weight'))
             else:
-                if (isinstance(child, nn.Conv2d) or
-                        isinstance(child, nn.Linear)):
-                    parameters_to_prune.append((child, 'weight'))
+                if (isinstance(layer, nn.Conv2d)
+                        or isinstance(layer, nn.Linear)):
+                    if name[-10:-2] != 'shortcut':
+                        parameters_to_prune.append((layer, 'weight'))
 
         prune_model(
             parameters_to_prune,
