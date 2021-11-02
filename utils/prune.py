@@ -77,12 +77,16 @@ def prune_model(parameters_to_prune, percentage, iterations, model,
                 device, output_directory, output_file, lr_scheduler=False):
     """
     Function to iteratively prune the given model.
+    Returns how many pruning iterations were done.
     """
     prev_acc = 100.0
     curr_acc = 100.0
+    curr_iter = 0
     acc_threshold = 30.0
 
     for i in range(iterations):
+        curr_iter += 1
+
         print(format_text("Pruning iteration {:02d}".format(i + 1)))
         iter_directory = os.path.join(output_directory, f"Level {i + 1}")
         os.mkdir(iter_directory)
@@ -105,11 +109,13 @@ def prune_model(parameters_to_prune, percentage, iterations, model,
             writer.writerow([sparsity, accuracy])
 
         # Stop pruning if accuracy is bad (to prevent wasting time).
-        curr_acc = accuracy
         prev_acc = curr_acc
+        curr_acc = accuracy
 
         if curr_acc < acc_threshold and prev_acc < acc_threshold:
             break
+
+    return curr_iter
 
 
 def load_pruned_model(

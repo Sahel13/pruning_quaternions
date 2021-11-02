@@ -168,7 +168,7 @@ for trial in range(num_trials):
                     if name[-10:-2] != 'shortcut':
                         parameters_to_prune.append((layer, 'weight'))
 
-        prune_model(
+        retrain_iter = prune_model(
             parameters_to_prune,
             pruning_percentage,
             pruning_iterations,
@@ -186,7 +186,7 @@ for trial in range(num_trials):
 
         retrain_pruned_model(
             parameters_to_prune,
-            pruning_iterations,
+            retrain_iter,
             model,
             trainloader,
             testloader,
