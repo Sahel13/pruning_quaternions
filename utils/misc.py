@@ -129,6 +129,50 @@ def data_loader(model_to_run, dataset, batch_size):
             num_workers=2
         )
 
+    elif dataset == 'pascal':
+        data_directory = os.path.join(dataset_dir(), 'pascal')
+
+        image_transform = transforms.Compose([
+            transforms.CenterCrop(size=(256, 256)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ])
+
+        mask_transform = transforms.Compose([
+            transforms.CenterCrop(size=(256, 256)),
+            transforms.ToTensor()
+        ])
+
+        trainset = torchvision.datasets.VOCSegmentation(
+            root=data_directory,
+            year='2012',
+            image_set='train',
+            download=False,
+            transform=image_transform,
+            target_transform=mask_transform
+        )
+        testset = torchvision.datasets.VOCSegmentation(
+            root=data_directory,
+            year='2012',
+            image_set='val',
+            download=False,
+            transform=image_transform,
+            target_transform=mask_transform
+        )
+
+        trainloader = torch.utils.data.DataLoader(
+            trainset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=2
+        )
+        testloader = torch.utils.data.DataLoader(
+            testset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=2
+        )
+
     else:
         raise ValueError("Dataset not known.")
 
