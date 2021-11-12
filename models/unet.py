@@ -8,7 +8,7 @@ def std_hparams():
         "dataset": 'pascal',
         "training": {
             "batch_size": 4,
-            "num_epochs": 1,
+            "num_epochs": 30,
             "learning_rate": 3e-4,
             "optimizer": "adam"
         },
@@ -38,7 +38,7 @@ class DoubleConv(nn.Module):
 
 class UNET(nn.Module):
     def __init__(
-            self, in_channels=3, out_channels=1, features=[64, 128, 256, 512],
+            self, in_channels=3, out_channels=21, features=[64, 128, 256, 512],
     ):
         super(UNET, self).__init__()
         self.ups = nn.ModuleList()
@@ -88,7 +88,7 @@ class UNET(nn.Module):
 
 def test():
     image = torch.randn((4, 3, 256, 256))
-    mask = torch.randn((4, 1, 256, 256))
+    mask = torch.randn((4, 21, 256, 256))
     model = UNET()
     preds = model(image)
     assert preds.shape == mask.shape

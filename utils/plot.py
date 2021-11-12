@@ -135,13 +135,16 @@ class ProcessResults():
 
     def plot_lth(self):
         pruning_iterations = 2
+        sparsity_data = self.spar_acc_data(True)
 
         for model in ['real', 'quat']:
+            model_data = sparsity_data[model]
             print(f'Results for {model}')
 
             plt.figure(figsize=(10, 7))
             for iter in range(pruning_iterations + 1):
                 data = self.train_log(iter)[model]
+                sparsity = model_data.iloc[iter, 0]
 
                 if data is None:
                     break
@@ -150,7 +153,7 @@ class ProcessResults():
                     x=data.iloc[:, 0],
                     y=data.iloc[:, 1],
                     # yerr=data.iloc[:, 2],
-                    label=iter
+                    label=sparsity
                 )
 
             plt.xlabel('Number of epochs.')

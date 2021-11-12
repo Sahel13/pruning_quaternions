@@ -46,7 +46,7 @@ def train_model(
                   0, accuracy))
             final_accuracy = accuracy
 
-        epoch_loss = 0.0
+        mini_batch_loss = 0
         for _, data in enumerate(trainloader, 0):
 
             images, labels = data[0].to(device), data[1].to(device)
@@ -60,14 +60,14 @@ def train_model(
             loss.backward()
             optimizer.step()
 
-            epoch_loss += loss.item()
+            mini_batch_loss = loss.item()
 
         # Test accuracy at the end of each epoch
         accuracy = test_model(model, testloader, device)
-        log_output.append([epoch + 1, epoch_loss / len(trainloader), accuracy])
+        log_output.append([epoch + 1, mini_batch_loss / len(trainloader), accuracy])
 
         print("ep  {:03d}  loss  {:.3f}  acc  {:.3f}%".format(
-            epoch + 1, epoch_loss / len(trainloader), accuracy))
+            epoch + 1, mini_batch_loss / len(trainloader), accuracy))
 
         if scheduler:
             scheduler.step()

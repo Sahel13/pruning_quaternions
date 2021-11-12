@@ -1,12 +1,14 @@
 import os
-import csv
 import argparse
 import numpy
+import models.unet as M
+import csv
 
 import torch
 
 from utils.misc import results_dir, format_text
-from utils.misc import display_model, data_loader
+from utils.misc import display_model
+from utils.dataloader import pascal_loader, remove_one_hot_enc
 
 # Ensuring reproducibility
 torch.manual_seed(0)
@@ -22,22 +24,9 @@ parser.add_argument('-g', '--gpu',
 args = parser.parse_args()
 
 out_dir_name = args.output_dir
-architecture = 'unet'
 gpu = args.gpu
 
-if architecture == 'lenet_300_100':
-    import models.lenet_300_100 as M
-elif architecture == 'conv_2':
-    import models.conv_2 as M
-elif architecture == 'conv_4':
-    import models.conv_4 as M
-elif architecture == 'conv_6':
-    import models.conv_6 as M
-elif architecture == 'unet':
-    import models.unet as M
-else:
-    raise ValueError("That is not a valid model.")
-
+model_to_run = 'real'
 # Load the hyper-parameters
 hparams = M.std_hparams()
 dataset = hparams['dataset']
@@ -53,7 +42,7 @@ if optimizer == 'sgd':
     weight_decay = tparams['weight_decay']
 
 output_directory = os.path.join(results_dir(), out_dir_name,
-                                'real')
+                                model_to_run)
 if not os.path.exists(output_directory):
     os.makedirs(output_directory)
 
@@ -61,8 +50,7 @@ if not os.path.exists(output_directory):
 Loading data and model.
 """
 # Get the data.
-trainloader, testloader = data_loader('real', dataset,
-                                      batch_size)
+trainloader, testloader = pascal_loader(batch_size)
 
 # Get the model.
 # model = M.Real() if model_to_run == 'real' else M.Quat()
@@ -73,7 +61,7 @@ device = torch.device(f'cuda:{gpu}' if use_gpu else 'cpu')
 model.to(device)
 
 # Loss function and optimizer
-criterion = torch.nn.BCEWithLogitsLoss()
+criterion = torch.nn.CrossEntropyLoss()
 
 if optimizer == 'adam':
     optimizer = torch.optim.Adam(model.parameters(), learning_rate)
@@ -89,34 +77,50 @@ display_model(model, output_directory, show=False)
 """
 Training.
 """
-print(format_text('real'))
+print(format_text(model_to_run))
 
 weight_path = os.path.join(output_directory, 'weights.pth')
+
+
+def get_iau(preds, labels):
+    intersection = 0
+    union = 0
+
+    for i in range(21):
+        predicted = (preds == i)
+        actual = (labels == i)
+        intersection += torch.logical_and(predicted, actual).float().sum()
+        union += torch.logical_or(predicted, actual).float().sum()
+
+    return intersection, union
 
 
 def test_model(model, testloader, device):
     """
     Function to test a model.
     """
-    correct = 0
-    total = 0
+    EPS = 1e-6
+    intersection = 0
+    union = 0
 
     with torch.no_grad():
         for data in testloader:
-            images, labels = data[0].to(device), data[1].to(device)
-            outputs = model(images)
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+            images, masks = data[0].to(device), data[1].to(device)
+            preds = model(images)
+            _, preds = torch.max(preds.data, 1)
+            masks = remove_one_hot_enc(masks)
+            batch_i, batch_u = get_iau(preds, masks)
+            intersection += batch_i
+            union += batch_u
 
-    accuracy = 100 * correct / total
-    return accuracy
+    iou = (intersection + EPS) / (union + EPS) * 100
+    return iou
 
 
 def train_model(
         model, trainloader, testloader, optimizer,
         criterion, num_epochs, device,
-        output_directory=None, retrain=False):
+        output_directory=None):
     """
     Function to train a model.
     """
@@ -155,12 +159,8 @@ def train_model(
         final_accuracy = accuracy
 
     if output_directory:
-        if not retrain:
-            file_path = os.path.join(output_directory, 'logger.csv')
-            weight_path = os.path.join(output_directory, 'weights.pth')
-        else:
-            file_path = os.path.join(output_directory, 'logger_retrain.csv')
-            weight_path = os.path.join(output_directory, 'weights_retrain.pth')
+        file_path = os.path.join(output_directory, 'logger.csv')
+        weight_path = os.path.join(output_directory, 'weights.pth')
 
         # Save the training log
         with open(file_path, 'w', newline='') as file:
@@ -183,5 +183,5 @@ train_model(
     criterion,
     num_epochs,
     device,
-    output_directory,
+    output_directory
 )
