@@ -30,7 +30,7 @@ def std_lr_scheduler(epochs):
 
 
 class Real(nn.Module):
-    def __init__(self):
+    def __init__(self, out_channels: int = 10):
         super().__init__()
         self.conv11 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1)
         self.conv12 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
@@ -41,7 +41,7 @@ class Real(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
         self.fc1 = nn.Linear(256 * 4 * 4, 256)
         self.fc2 = nn.Linear(256, 256)
-        self.fc3 = nn.Linear(256, 10)
+        self.fc3 = nn.Linear(256, out_channels)
 
     def forward(self, x):
         x = F.relu(self.conv11(x))
@@ -61,7 +61,7 @@ class Real(nn.Module):
 
 
 class Quat(nn.Module):
-    def __init__(self):
+    def __init__(self, out_channels: int = 10):
         super().__init__()
         self.conv11 = layers.QConv2d(1, 16, kernel_size=3,
                                      stride=1, padding=1)
@@ -78,7 +78,7 @@ class Quat(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
         self.fc1 = layers.QLinear(64 * 4 * 4, 64)
         self.fc2 = layers.QLinear(64, 64)
-        self.fc3 = nn.Linear(256, 10)
+        self.fc3 = nn.Linear(256, out_channels)
 
     def forward(self, x):
         x = F.relu(self.conv11(x))

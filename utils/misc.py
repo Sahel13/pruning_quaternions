@@ -95,6 +95,63 @@ def data_loader(model_to_run, dataset, batch_size):
                 num_workers=2
             )
 
+    elif dataset == 'cifar100':
+        data_directory = os.path.join(dataset_dir(), 'cifar100')
+
+        train_transform = transforms.Compose([
+            transforms.RandomCrop(32, 4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ])
+        test_transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ])
+
+        trainset = torchvision.datasets.CIFAR100(
+            root=data_directory,
+            train=True,
+            download=False,
+            transform=train_transform
+        )
+        testset = torchvision.datasets.CIFAR100(
+            root=data_directory,
+            train=False,
+            download=False,
+            transform=test_transform
+        )
+
+        if model_to_run == 'quat':
+            trainloader = torch.utils.data.DataLoader(
+                trainset,
+                batch_size=batch_size,
+                shuffle=True,
+                num_workers=2,
+                collate_fn=utils.convert_data_for_quaternion
+            )
+            testloader = torch.utils.data.DataLoader(
+                testset,
+                batch_size=batch_size,
+                shuffle=True,
+                num_workers=2,
+                collate_fn=utils.convert_data_for_quaternion
+            )
+
+        else:
+            trainloader = torch.utils.data.DataLoader(
+                trainset,
+                batch_size=batch_size,
+                shuffle=True,
+                num_workers=2
+            )
+            testloader = torch.utils.data.DataLoader(
+                testset,
+                batch_size=batch_size,
+                shuffle=True,
+                num_workers=2
+            )
+
     elif dataset == 'mnist':
         data_directory = os.path.join(dataset_dir(), 'mnist')
 
