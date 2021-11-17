@@ -1,6 +1,5 @@
 import os
 import csv
-from prettytable import PrettyTable
 
 import torch
 import torch.nn as nn
@@ -10,57 +9,7 @@ from utils.misc import format_text, get_trainable_params
 from utils.train import train_model_ignite
 
 
-def layer_sparsity(layer: nn.Module):
-    """
-    Returns the sparsity of a given layer.
-    """
-    zeros = 0
-    total = 0
-
-    for _, parameter in layer.named_parameters():
-        total += parameter.numel()
-
-    for _, buffer in layer.named_buffers():
-        zeros += torch.sum(buffer == 0).item()
-
-    sparsity = 100 * (total - zeros) / total
-    return sparsity, zeros, total
-
-
-def sparsity_check(model: nn.Module, output_directory=None, show=False):
-    """
-    Returns the sparsity of the entire model.
-    """
-    table = PrettyTable(["Layers", "Percentage of weights left"])
-    zeros = 0
-    total = 0
-
-    for layer_name, layer in model.named_modules():
-        if (layer_name not in ['', 'pool', 'abs']
-                and layer_name[-8:] != 'shortcut'):
-            module_sparsity, layer_zeros, layer_total = layer_sparsity(layer)
-            zeros += layer_zeros
-            total += layer_total
-            table.add_row([layer_name, '{:.3f}'.format(module_sparsity)])
-
-    sparsity = 100 * (total - zeros) / total
-
-    table.add_row(["Total", '{:.3f}'.format(sparsity)])
-
-    if show:
-        print(format_text("Model Sparsity", heading=False))
-        print(table)
-        print('\n')
-
-    if output_directory:
-        file_path = os.path.join(output_directory, 'sparsity_report.txt')
-        with open(file_path, 'w') as file:
-            file.write(str(table))
-
-    return sparsity
-
-
-def new_sparsity_fn(model: nn.Module):
+def _get_model_sparsity(model: nn.Module):
     total = get_trainable_params(model)
 
     pruned_params = 0
@@ -74,7 +23,7 @@ def new_sparsity_fn(model: nn.Module):
 
 def prune_model(parameters_to_prune, percentage, iterations, model,
                 trainloader, testloader, optimizer, criterion, num_epochs,
-                device, output_directory, output_file, lr_scheduler=False):
+                device, output_directory, output_file):
     """
     Function to iteratively prune the given model.
     Returns how many pruning iterations were done.
@@ -99,10 +48,10 @@ def prune_model(parameters_to_prune, percentage, iterations, model,
 
         accuracy = train_model_ignite(
             model, trainloader, testloader, optimizer,
-            criterion, num_epochs, device, iter_directory, lr_scheduler
+            criterion, num_epochs, device, iter_directory
         )
 
-        sparsity = new_sparsity_fn(model)
+        sparsity = _get_model_sparsity(model)
 
         with open(output_file, 'a', newline='') as file:
             writer = csv.writer(file)
@@ -164,7 +113,7 @@ def load_pruned_model(
 def retrain_pruned_model(
         parameters_to_prune, iterations, model,
         trainloader, testloader, optimizer, criterion, num_epochs,
-        device, output_directory, output_file, lr_scheduler=False):
+        device, output_directory, output_file):
     """
     Function to retrain pruned model from scratch.
     """
@@ -186,9 +135,9 @@ def retrain_pruned_model(
 
         accuracy = train_model_ignite(
             model, trainloader, testloader, optimizer, criterion,
-            num_epochs, device, iter_directory, lr_scheduler, retrain=True
+            num_epochs, device, iter_directory, retrain=True
         )
-        sparsity = new_sparsity_fn(model)
+        sparsity = _get_model_sparsity(model)
 
         with open(output_file, 'a', newline='') as file:
             writer = csv.writer(file)

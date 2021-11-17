@@ -2,18 +2,15 @@ import os
 import csv
 
 import torch
-# from torch.optim.lr_scheduler import LambdaLR
-from torch.optim.lr_scheduler import OneCycleLR
 
 from ignite.metrics import Accuracy, Loss
 from ignite.engine import Events, create_supervised_evaluator
 from ignite.engine import create_supervised_trainer
-from ignite.handlers.param_scheduler import LRScheduler
 
 
 def test_model(model, testloader, device):
     """
-    Function to test a model.
+    Function to test a model. Returns percentage accuracy.
     """
     correct = 0
     total = 0
@@ -33,7 +30,7 @@ def test_model(model, testloader, device):
 def train_model(
         model, trainloader, testloader, optimizer,
         criterion, num_epochs, device,
-        output_directory=None, scheduler=None, retrain=False):
+        output_directory=None, retrain=False):
     """
     Function to train a model.
     """
@@ -64,13 +61,11 @@ def train_model(
 
         # Test accuracy at the end of each epoch
         accuracy = test_model(model, testloader, device)
-        log_output.append([epoch + 1, mini_batch_loss / len(trainloader), accuracy])
+        log_output.append([epoch + 1, mini_batch_loss / len(trainloader),
+                           accuracy])
 
         print("ep  {:03d}  loss  {:.3f}  acc  {:.3f}%".format(
             epoch + 1, mini_batch_loss / len(trainloader), accuracy))
-
-        if scheduler:
-            scheduler.step()
 
         final_accuracy = accuracy
 
@@ -98,7 +93,7 @@ def train_model(
 def train_model_ignite(
         model, trainloader, testloader, optimizer,
         criterion, num_epochs, device,
-        output_directory=None, lr_scheduler=False, retrain=False):
+        output_directory=None, retrain=False):
     """
     Function to train a model using the new ignite library.
     """
@@ -113,12 +108,6 @@ def train_model_ignite(
     evaluator = create_supervised_evaluator(
         model, metrics=metrics, device=device
     )
-
-    if lr_scheduler:
-        scheduler = OneCycleLR(optimizer, max_lr=2e-3,
-                               total_steps=num_epochs, pct_start=0.25)
-        scheduler_engine = LRScheduler(scheduler)
-        trainer.add_event_handler(Events.EPOCH_COMPLETED, scheduler_engine)
 
     log_output = []
 

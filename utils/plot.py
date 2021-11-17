@@ -1,9 +1,12 @@
 import os
+import numpy as np
+import matplotlib
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-sns.set_theme()
+sns.set_theme(style='darkgrid', palette='colorblind', font_scale=2.2)
+fig_size = (16, 10)
 
 
 class ProcessResults():
@@ -105,7 +108,7 @@ class ProcessResults():
 
         return data
 
-    def plot_train_log(self):
+    def plot_train_log(self, file_name: str):
         """
         Function to plot data from pruning experiments.
         """
@@ -113,36 +116,42 @@ class ProcessResults():
 
         data = self.train_log(0)
 
-        plt.figure(figsize=(10, 7))
+        plt.figure(figsize=fig_size)
         plt.errorbar(
             x=data['real']['Epoch (R)'],
             y=data['real']['Mean (R)'],
             yerr=data['real']['Std (R)'],
-            label='Real'
+            label='Real',
+            fmt='x-.'
         )
 
         plt.errorbar(
             x=data['quat']['Epoch (Q)'],
             y=data['quat']['Mean (Q)'],
             yerr=data['quat']['Std (Q)'],
-            label='Quaternion'
+            label='Quaternion',
+            fmt='v--'
         )
 
         plt.xlabel('Number of training epochs.')
         plt.ylabel('Accuracy')
         plt.legend()
+        plt.savefig('images/' + file_name + '_1.png', bbox_inches='tight')
         plt.show()
 
-    def plot_lth(self):
-        pruning_iterations = 2
+    def plot_lth(self, file_name: str, start: int = 0, end: int = 2):
         sparsity_data = self.spar_acc_data(True)
+        levels = np.arange(start=start, stop=end + 1)
 
         for model in ['real', 'quat']:
+            if model == 'real':
+                continue
             model_data = sparsity_data[model]
             print(f'Results for {model}')
 
-            plt.figure(figsize=(10, 7))
-            for iter in range(pruning_iterations + 1):
+            plt.figure(figsize=fig_size)
+
+            for iter in levels:
                 data = self.train_log(iter)[model]
                 sparsity = model_data.iloc[iter, 0]
 
@@ -152,13 +161,14 @@ class ProcessResults():
                 plt.errorbar(
                     x=data.iloc[:, 0],
                     y=data.iloc[:, 1],
-                    # yerr=data.iloc[:, 2],
-                    label=sparsity
+                    yerr=data.iloc[:, 2],
+                    label=f'{sparsity:.0f}%'
                 )
 
-            plt.xlabel('Number of epochs.')
+            plt.xlabel('Number of training epochs.')
             plt.ylabel('Accuracy')
             plt.legend()
+            plt.savefig('images/' + file_name + '_0.png', bbox_inches='tight')
             plt.show()
 
     def spar_acc_data(self, retrain: bool):
@@ -176,11 +186,19 @@ class ProcessResults():
                 col_names = ['Sparsity (Q)', 'Mean (Q)', 'Std (Q)']
 
             table.columns = col_names
+
+            to_drop = []
+            for index, _ in table.iterrows():
+                if table.iloc[index, 1] <= 30.0:
+                    to_drop.append(index)
+            table = table.drop(index=to_drop)
+
             data[model] = table
 
         return data
 
-    def plot_spar_acc(self, retrain: bool = True):
+    def plot_spar_acc(self, file_name: str, qr_sparsity=0.25,
+                      retrain: bool = True):
         """
         Function to plot data from pruning experiments.
         """
@@ -192,23 +210,42 @@ class ProcessResults():
             last_words = 'during pruning.'
         print(f'Accuracy vs sparsity {last_words}')
 
-        plt.figure(figsize=(10, 7))
-        plt.errorbar(
+        fig, ax = plt.subplots(figsize=fig_size)
+        ax.errorbar(
             x=data['real']['Sparsity (R)'],
             y=data['real']['Mean (R)'],
             yerr=data['real']['Std (R)'],
-            label='Real'
+            label='Real',
+            fmt='x-.'
         )
 
-        plt.errorbar(
-            x=data['quat']['Sparsity (Q)']*0.25,
+        ax.errorbar(
+            x=data['quat']['Sparsity (Q)'] * qr_sparsity,
             y=data['quat']['Mean (Q)'],
             yerr=data['quat']['Std (Q)'],
-            label='Quaternion'
+            label='Quaternion',
+            fmt='v--'
         )
 
-        plt.xscale('log')
-        plt.xlabel('Percentage of weights left.')
-        plt.ylabel('Accuracy')
+        ax.set_xscale('log')
+        ax.set_xlabel('Percentage of weights left.')
+        ax.set_ylabel('Accuracy')
+        ax.invert_xaxis()
+
+        if file_name == 'conv_6':
+            ax.set_xticks([6.25, 12.5, 25, 50, 100])
+        elif file_name == 'conv_6_cifar100':
+            ax.set_xticks([3.125, 6.25, 12.5, 25, 50, 100])
+        elif file_name == 'conv_4_cifar100':
+            ax.set_xticks([3.125, 6.25, 12.5, 25, 50, 100])
+        elif file_name == 'lenet_300_100':
+            ax.set_xticks([1.5625, 3.125, 6.25, 12.5, 25, 50, 100])
+        elif file_name == 'lenet_300_100_cifar10':
+            ax.set_xticks([6.25, 12.5, 25, 50, 100])
+        else:
+            ax.set_xticks([0.78125, 1.5625, 3.125, 6.25, 12.5, 25, 50, 100])
+
+        ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
         plt.legend()
+        plt.savefig('images/' + file_name + '_2.png', bbox_inches='tight')
         plt.show()

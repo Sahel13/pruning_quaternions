@@ -10,228 +10,123 @@ import torchvision.transforms as transforms
 from htorch import utils
 
 
-def results_dir():
-    """
-    Specify where to save the results.
-    """
-    return os.path.join(pathlib.Path.home(), 'Documents', 'code', 'results')
-
-
-def archive_dir():
-    """
-    Directory where results of previous experiments are stored.
-    """
-    return os.path.join(pathlib.Path.home(), 'Documents', 'code',
-                        'results_archive')
-
-
 def dataset_dir():
     """
     Specify where to save the datasets.
     """
-    return os.path.join(pathlib.Path.home(), 'Documents', 'code', 'datasets')
+    return os.path.join(pathlib.Path.home(), 'Documents', 'datasets')
+
+
+def results_dir():
+    """
+    Specify where to save the results.
+    """
+    return os.path.join(pathlib.Path.home(), 'Documents', 'results')
+
+
+def _load_from_set(trainset, testset, batch_size, model_to_run, collate=True):
+    """
+    Loads data with an additional channel for quat models if necessary.
+    If collate=True, adds grayscale version as the fourth
+    channel to input images.
+    """
+    collate_fn = None
+    if collate and model_to_run == 'quat':
+        collate_fn = utils.convert_data_for_quaternion
+
+    trainloader = torch.utils.data.DataLoader(
+        trainset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=2,
+        collate_fn=collate_fn
+    )
+    testloader = torch.utils.data.DataLoader(
+        testset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=2,
+        collate_fn=collate_fn
+    )
+
+    return trainloader, testloader
 
 
 def data_loader(model_to_run, dataset, batch_size):
     """
     Data loader function.
-    Has different conditions for different datasets
-    and both real and quaternion networks.
+    Has different conditions for different datasets.
     """
+    data_directory = os.path.join(dataset_dir(), dataset)
+
+    train_transform = transforms.Compose([
+        transforms.RandomCrop(32, 4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+    ])
+    test_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+    ])
+
     if dataset == 'cifar10':
-        data_directory = os.path.join(dataset_dir(), 'cifar10')
-
-        train_transform = transforms.Compose([
-            transforms.RandomCrop(32, 4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ])
-        test_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ])
-
         trainset = torchvision.datasets.CIFAR10(
             root=data_directory,
             train=True,
-            download=False,
+            download=True,
             transform=train_transform
         )
         testset = torchvision.datasets.CIFAR10(
             root=data_directory,
             train=False,
-            download=False,
+            download=True,
             transform=test_transform
         )
 
-        if model_to_run == 'quat':
-            trainloader = torch.utils.data.DataLoader(
-                trainset,
-                batch_size=batch_size,
-                shuffle=True,
-                num_workers=2,
-                collate_fn=utils.convert_data_for_quaternion
-            )
-            testloader = torch.utils.data.DataLoader(
-                testset,
-                batch_size=batch_size,
-                shuffle=True,
-                num_workers=2,
-                collate_fn=utils.convert_data_for_quaternion
-            )
-
-        else:
-            trainloader = torch.utils.data.DataLoader(
-                trainset,
-                batch_size=batch_size,
-                shuffle=True,
-                num_workers=2
-            )
-            testloader = torch.utils.data.DataLoader(
-                testset,
-                batch_size=batch_size,
-                shuffle=True,
-                num_workers=2
-            )
+        trainloader, testloader = _load_from_set(
+            trainset, testset, batch_size, model_to_run)
 
     elif dataset == 'cifar100':
-        data_directory = os.path.join(dataset_dir(), 'cifar100')
-
-        train_transform = transforms.Compose([
-            transforms.RandomCrop(32, 4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ])
-        test_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ])
-
         trainset = torchvision.datasets.CIFAR100(
             root=data_directory,
             train=True,
-            download=False,
+            download=True,
             transform=train_transform
         )
         testset = torchvision.datasets.CIFAR100(
             root=data_directory,
             train=False,
-            download=False,
+            download=True,
             transform=test_transform
         )
 
-        if model_to_run == 'quat':
-            trainloader = torch.utils.data.DataLoader(
-                trainset,
-                batch_size=batch_size,
-                shuffle=True,
-                num_workers=2,
-                collate_fn=utils.convert_data_for_quaternion
-            )
-            testloader = torch.utils.data.DataLoader(
-                testset,
-                batch_size=batch_size,
-                shuffle=True,
-                num_workers=2,
-                collate_fn=utils.convert_data_for_quaternion
-            )
-
-        else:
-            trainloader = torch.utils.data.DataLoader(
-                trainset,
-                batch_size=batch_size,
-                shuffle=True,
-                num_workers=2
-            )
-            testloader = torch.utils.data.DataLoader(
-                testset,
-                batch_size=batch_size,
-                shuffle=True,
-                num_workers=2
-            )
+        trainloader, testloader = _load_from_set(
+            trainset, testset, batch_size, model_to_run)
 
     elif dataset == 'mnist':
-        data_directory = os.path.join(dataset_dir(), 'mnist')
-
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.1307], std=[0.3081])
         ])
-
         trainset = torchvision.datasets.MNIST(
             root=data_directory,
             train=True,
-            download=False,
+            download=True,
             transform=transform
         )
         testset = torchvision.datasets.MNIST(
             root=data_directory,
             train=False,
-            download=False,
+            download=True,
             transform=transform
         )
 
-        trainloader = torch.utils.data.DataLoader(
-            trainset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=2
-        )
-        testloader = torch.utils.data.DataLoader(
-            testset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=2
-        )
-
-    elif dataset == 'pascal':
-        data_directory = os.path.join(dataset_dir(), 'pascal')
-
-        image_transform = transforms.Compose([
-            transforms.CenterCrop(size=(256, 256)),
-            transforms.ToTensor(),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ])
-
-        mask_transform = transforms.Compose([
-            transforms.CenterCrop(size=(256, 256)),
-            transforms.ToTensor()
-        ])
-
-        trainset = torchvision.datasets.VOCSegmentation(
-            root=data_directory,
-            year='2012',
-            image_set='train',
-            download=False,
-            transform=image_transform,
-            target_transform=mask_transform
-        )
-        testset = torchvision.datasets.VOCSegmentation(
-            root=data_directory,
-            year='2012',
-            image_set='val',
-            download=False,
-            transform=image_transform,
-            target_transform=mask_transform
-        )
-
-        trainloader = torch.utils.data.DataLoader(
-            trainset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=2
-        )
-        testloader = torch.utils.data.DataLoader(
-            testset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=2
-        )
+        trainloader, testloader = _load_from_set(
+            trainset, testset, batch_size, model_to_run, collate=False)
 
     else:
-        raise ValueError("Dataset not known.")
+        raise ValueError("Invalid dataset.")
 
     return trainloader, testloader
 
@@ -288,3 +183,12 @@ def get_trainable_params(model: nn.Module):
     """
     num_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
     return num_param
+
+
+def qr_relative_sparsity(quat: nn.Module, real: nn.Module):
+    """
+    Function to get the relative sparsity of quat and real models.
+    """
+    q_params = float(get_trainable_params(quat))
+    r_params = float(get_trainable_params(real))
+    return q_params/r_params

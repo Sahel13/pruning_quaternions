@@ -4,7 +4,7 @@ from htorch import layers
 import torch.nn.functional as F
 
 """
-Conv-6 architecture from the LTH paper.
+Conv-6 architecture.
 """
 
 
@@ -23,10 +23,6 @@ def std_hparams():
         }
     }
     return hparams
-
-
-def std_lr_scheduler(epochs):
-    return 1
 
 
 class Real(nn.Module):

@@ -25,15 +25,15 @@ parser.add_argument('-o', '--output_dir',
 parser.add_argument('-g', '--gpu',
                     default='0',
                     help="Which gpu to use for training.")
-parser.add_argument('-lrs', '--lr_scheduler',
-                    action='store_true',
-                    help="Whether to use the learning rate scheduler.")
+parser.add_argument('-n', '--num_trials',
+                    default='5',
+                    help="Number of times to repeat the experiment.")
 args = parser.parse_args()
 
 out_dir_name = args.output_dir
 architecture = args.model
 gpu = args.gpu
-lr_scheduler = args.lr_scheduler
+num_trials = args.num_trials
 
 if architecture == 'lenet_300_100':
     import models.lenet_300_100 as M
@@ -48,10 +48,8 @@ elif architecture == 'resnet':
 else:
     raise ValueError("That is not a valid model.")
 
-num_trials = 5
 for trial in range(num_trials):
-
-    for model_to_run in ['real', 'quat']:
+    for model_to_run in ['quat', 'real']:
 
         # Load the hyper-parameters
         hparams = M.std_hparams()
@@ -137,7 +135,6 @@ for trial in range(num_trials):
                 num_epochs,
                 device,
                 pre_train_dir,
-                lr_scheduler
             )
 
         for item in [data_file, retrain_data]:
@@ -181,7 +178,6 @@ for trial in range(num_trials):
             device,
             output_directory,
             data_file,
-            lr_scheduler
         )
 
         retrain_pruned_model(
@@ -196,5 +192,4 @@ for trial in range(num_trials):
             device,
             output_directory,
             retrain_data,
-            lr_scheduler
         )
