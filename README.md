@@ -23,7 +23,7 @@ Now to run pruning experiments:
 $ python prune.py -m model_name -o output_directory -g gpu -n 5
 ```
 
-The experiments uses a GPU by default (defaults to the first GPU). If you would like to run the experiments on CPU, set the `use_gpu` variable to `False` in the respective file (`train` or `prune`).
+The experiments use a GPU by default (defaults to the first GPU). If you would like to run the experiments on CPU, set the `use_gpu` variable to `False` in the respective file (`train` or `prune`).
 
 ## Visualizing the results.
 The results of pruning experiments can be visualized with the methods provided in `utils/plot.py`. Example usage is illustrated in `plot.ipynb`. Create a folder named `images` in the project directory before running the file.
@@ -31,4 +31,4 @@ The results of pruning experiments can be visualized with the methods provided i
 ## Extending
 
 ### Add a new model.
-To add a new model, create a new file in `models/`, and follow the template of `models/lenet_300_100.py`. Both real and quaternion implementations of the models must exist as different classes with names `Real` and `Quat`. Hyper-parameters for training and pruning should be specified in the method `std_hparams()`.
+To add a new model, create a new file in `models/`, and follow the template of `models/lenet_300_100.py`. Both real and quaternion implementations of the models must exist as different classes with names `Real` and `Quat`. Hyper-parameters for training and pruning should be specified in the method `std_hparams()`. The model should then imported inside `prune.py`.
