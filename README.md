@@ -1,4 +1,4 @@
-# Quaternion LTH
+# Pruning Quaternions
 
 Code to run pruning experiments on quaternion neural networks. The methods to implement quaternion neural networks are borrowed from [hTorch](https://github.com/ispamm/hTorch), and the various pruning experiments are inspired from [open\_lth](https://github.com/facebookresearch/open\_lth).
 
@@ -6,8 +6,8 @@ Code to run pruning experiments on quaternion neural networks. The methods to im
 Clone the repo and move into the folder. Create a python virtual environment and install PyTorch version specific to the system. Then install packages from `requirements.txt`, followed by the local package in the repo directory.
 Example setup:
 ```
-$ git clone https://github.com/Sahel13/quaternion_lth.git
-$ cd quaternion_lth/
+$ git clone https://github.com/Sahel13/pruning_quaternions.git
+$ cd pruning_quaternions/
 $ python3 -m venv env
 $ source env/bin/activate
 $ pip install torch torchvision
