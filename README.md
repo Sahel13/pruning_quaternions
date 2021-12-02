@@ -23,7 +23,7 @@ Now to run pruning experiments:
 $ python prune.py -m model_name -o output_directory -g gpu -n 5
 ```
 
-The experiments use a GPU by default (defaults to the first GPU). If you would like to run the experiments on CPU, set the `use_gpu` variable to `False` in the respective file (`train` or `prune`).
+The experiments use a GPU by default (defaults to the first GPU). If you would like to run the experiments on CPU, set the `use_gpu` variable to `False` in `prune.py`.
 
 ## Visualizing the results.
 The results of pruning experiments can be visualized with the methods provided in `utils/plot.py`. Example usage is illustrated in `plot.ipynb`. Create a folder named `images` in the project directory before running the file.
