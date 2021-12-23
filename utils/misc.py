@@ -150,8 +150,8 @@ def format_text(input, length=40, heading=True):
 
 def display_model(model: nn.Module, output_directory=None, show=True):
     """
-    Function to print the structure of the neural
-    network model (its constituent layers and the
+    Prints the structure of the neural network
+    model (its constituent layers and the
     number of parameters in each) as a table.
     """
     table = PrettyTable(["Layers", "Parameters"])

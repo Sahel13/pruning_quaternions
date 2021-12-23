@@ -16,8 +16,8 @@ from utils.prune import prune_model, retrain_pruned_model
 parser = argparse.ArgumentParser()
 parser.add_argument('-m', '--model',
                     required=True,
-                    choices=['lenet_300_100', 'conv_2', 'conv_4', 'conv_6',
-                             'resnet'],
+                    choices=['lenet_300_100', 'lenet_12', 'conv_2', 'conv_4',
+                             'conv_6', 'resnet'],
                     help="The model architecture to run.")
 parser.add_argument('-o', '--output_dir',
                     required=True,
@@ -33,10 +33,12 @@ args = parser.parse_args()
 out_dir_name = args.output_dir
 architecture = args.model
 gpu = args.gpu
-num_trials = args.num_trials
+num_trials = int(args.num_trials)
 
 if architecture == 'lenet_300_100':
     import models.lenet_300_100 as M
+elif architecture == 'lenet_12':
+    import models.lenet_12 as M
 elif architecture == 'conv_2':
     import models.conv_2 as M
 elif architecture == 'conv_4':

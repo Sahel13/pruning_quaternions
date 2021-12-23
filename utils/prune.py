@@ -97,7 +97,7 @@ def load_pruned_model(
                 with torch.no_grad():
                     parameter.data = initial_weights[name[:-5]]
 
-            # Not sure if this case will ever arise (kept just in case)
+            # This case should ever arise (kept just in case)
             else:
                 raise ValueError("Parameter was not found.")
 

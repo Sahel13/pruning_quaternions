@@ -31,4 +31,4 @@ The results of pruning experiments can be visualized with the methods provided i
 ## Extending
 
 ### Add a new model.
-To add a new model, create a new file in `models/`, and follow the template of `models/lenet_300_100.py`. Both real and quaternion implementations of the models must exist as different classes with names `Real` and `Quat`. Hyper-parameters for training and pruning should be specified in the method `std_hparams()`. The model should then imported inside `prune.py`.
+To add a new model, create a new file in `models/`, and follow the template of `models/lenet_300_100.py`. Both real and quaternion implementations of the model must exist as different classes with names `Real` and `Quat` respectively. Hyper-parameters for training and pruning should be specified in the method `std_hparams()`. The model should then be imported inside `prune.py`.

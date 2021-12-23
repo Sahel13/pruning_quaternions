@@ -40,25 +40,23 @@ class Block(nn.Module):
 
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3,
                                stride=stride, padding=1, bias=False)
-        # self.bn1 = nn.BatchNorm2d(out_channels)
+        self.bn1 = nn.BatchNorm2d(out_channels)
         self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3,
                                stride=1, padding=1, bias=False)
-        # self.bn2 = nn.BatchNorm2d(out_channels)
+        self.bn2 = nn.BatchNorm2d(out_channels)
 
         if downsample or in_channels != out_channels:
             self.shortcut = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=2,
                           bias=False),
-                # nn.BatchNorm2d(out_channels)
+                nn.BatchNorm2d(out_channels)
             )
         else:
             self.shortcut = nn.Sequential()
 
     def forward(self, x):
-        # out = F.relu(self.bn1(self.conv1(x)))
-        # out = self.bn2(self.conv2(out))
-        out = F.relu(self.conv1(x))
-        out = self.conv2(out)
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
         out += self.shortcut(x)
         return F.relu(out)
 
@@ -79,7 +77,7 @@ class Real(nn.Module):
         current_filters = architecture[0][0]
         self.conv = nn.Conv2d(3, current_filters, kernel_size=3, stride=1,
                               padding=1, bias=False)
-        # self.bn = nn.BatchNorm2d(current_filters)
+        self.bn = nn.BatchNorm2d(current_filters)
 
         # ResNet blocks
         blocks = []
@@ -95,8 +93,7 @@ class Real(nn.Module):
         self.fc = nn.Linear(architecture[-1][0], 10)
 
     def forward(self, x):
-        # x = F.relu(self.bn(self.conv(x)))
-        x = F.relu(self.conv(x))
+        x = F.relu(self.bn(self.conv(x)))
         x = self.blocks(x)
         x = F.avg_pool2d(x, x.size()[3])
         x = torch.flatten(x, 1)
@@ -112,27 +109,25 @@ class Quat_Block(nn.Module):
 
         self.conv1 = layers.QConv2d(in_channels, out_channels, kernel_size=3,
                                     stride=stride, padding=1, bias=False)
-        # self.bn1 = layers.QBatchNorm2d(out_channels)
+        self.bn1 = layers.QBatchNorm2d(out_channels)
 
         self.conv2 = layers.QConv2d(out_channels, out_channels, kernel_size=3,
                                     stride=1, padding=1, bias=False)
-        # self.bn2 = layers.QBatchNorm2d(out_channels)
+        self.bn2 = layers.QBatchNorm2d(out_channels)
 
         # Shortcut connection
         if downsample or in_channels != out_channels:
             self.shortcut = nn.Sequential(
                 layers.QConv2d(in_channels, out_channels, kernel_size=1,
                                stride=2, bias=False),
-                # layers.QBatchNorm2d(out_channels)
+                layers.QBatchNorm2d(out_channels)
             )
         else:
             self.shortcut = nn.Sequential()
 
     def forward(self, x):
-        # out = F.relu(self.bn1(self.conv1(x)))
-        # out = self.bn2(self.conv2(out))
-        out = F.relu(self.conv1(x))
-        out = self.conv2(out)
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
         out += self.shortcut(x)
         return F.relu(out)
 
@@ -149,7 +144,7 @@ class Quat(nn.Module):
         current_filters = architecture[0][0]
         self.conv = layers.QConv2d(1, current_filters, kernel_size=3, stride=1,
                                    padding=1, bias=False)
-        # self.bn = layers.QBatchNorm2d(current_filters)
+        self.bn = layers.QBatchNorm2d(current_filters)
 
         # ResNet blocks
         blocks = []
@@ -165,8 +160,7 @@ class Quat(nn.Module):
         self.fc = nn.Linear(architecture[-1][0] * 4, 10)
 
     def forward(self, x):
-        # x = F.relu(self.bn(self.conv(x)))
-        x = F.relu(self.conv(x))
+        x = F.relu(self.bn(self.conv(x)))
         x = self.blocks(x)
         x = F.avg_pool2d(x, x.size()[3])
         x = torch.flatten(x, 1)
